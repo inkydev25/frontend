@@ -1,0 +1,2357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>INKY Tombola</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color-main: #2E3A46;
+            --bg-color-gradient-light: #3C4F65;
+            --bg-color-gradient-dark: #4A5A6A;
+            --bg-color-box: rgba(81, 100, 118, 0.5);
+            --text-color-light: #fff;
+            --text-color-accent: #E5C07B;
+            --border-color: rgba(255, 255, 255, 0.2);
+            --color-link: #61afef;
+            --color-link-hover: #559bd7;
+            --color-tooltip-bg: rgb(62, 100, 119);
+            --color-tooltip-border: #2f2d2d;
+            --color-error: #ff4d4f;
+            --color-success: rgb(141, 171, 141);
+        }
+
+        /* ===== BASE STYLES ===== */
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Poppins', sans-serif;
+            color: var(--text-color-light);
+            background: linear-gradient(270deg, var(--bg-color-gradient-light), var(--bg-color-main), var(--bg-color-gradient-dark), #6C7A89);
+            background-size: 800% 800%;
+            animation: gradientBG 20s ease infinite;
+            overflow: auto;
+            position: relative;
+            min-height: 150vh; 
+            overflow-x: hidden;
+        }
+
+        /* ===== ANIMATIONS ===== */
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes gradientAnimation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes floatSlow {
+            0% { transform: translate(0, 0); }
+            25% { transform: translate(25px, 20px); }
+            50% { transform: translate(-20px, 25px); }
+            75% { transform: translate(20px, -20px); }
+            100% { transform: translate(0, 0); }
+        }
+
+        @keyframes blinker { 50% { opacity: 0; } }
+        
+        .blinking-text { animation: blinker 1s linear infinite; }
+
+        /* ===== FLOATING LOGOS ===== */
+        .floating-logo {
+            position: absolute;
+            width: 120px;
+            opacity: 0.1;
+            pointer-events: none;
+            animation: floatSlow 25s ease-in-out infinite;
+        }
+
+        /* ===== HEADER & NAVIGATION ===== */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(0,0,0,0.35);
+            min-height: auto;
+        }
+        
+        header nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            height: auto;
+            position: relative;
+            max-width: 1880px;
+            margin: 0 auto;
+        }
+
+        .button, .total-buy button {
+            padding: 10px 25px;
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--text-color-light);
+            width: 200px;
+            background: linear-gradient(270deg, var(--bg-color-gradient-dark), var(--bg-color-main), #6C7A89, var(--bg-color-gradient-dark));
+            background-size: 600% 600%;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s, color 0.3s, background 0.5s;
+        }
+
+        .button:hover, .total-buy button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px 3px #6C7A89;
+            animation: gradientAnimation 3s ease infinite;
+            color: var(--text-color-accent);
+        }
+        
+        .connected { 
+            color: var(--text-color-accent); 
+            animation: none; 
+        }
+
+        .page-title-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .page-logo {
+            width: 60px;
+            height: auto;
+            opacity: 0.9;
+        }
+
+        .page-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 23px;
+            font-weight: 600;
+            color: var(--text-color-accent);
+            text-align: center;
+            white-space: nowrap;
+            letter-spacing: 0.5px;
+            transition: color 0.3s, text-shadow 0.3s;
+        }
+        
+        .page-title:hover {
+            color: #FFD966;
+            text-shadow: 0 0 12px rgba(255, 217, 102, 0.9);
+        }
+        
+        #how-it-works-link {
+            font-size: 16px;
+            color: var(--text-color-accent);
+            text-decoration: none;
+            cursor: pointer;
+            transition: color 0.3s, transform 0.3s;
+            position: relative;
+        }
+        
+        #how-it-works-link::after {
+            content: '';
+            display: block;
+            width: 0;
+            height: 2px;
+            background: #FFD700;
+            transition: width 0.3s;
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+        }
+        
+        #how-it-works-link:hover {
+            color: #dfc94a;
+            transform: scale(1.1);
+        }
+        
+        #how-it-works-link:hover::after {
+            width: 100%;
+        }
+
+        /* ===== MAIN LAYOUT ===== */
+        main {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            grid-template-rows: auto auto auto auto 1fr 1fr;
+            gap: 8px;
+            padding: 20px;
+            max-width: 1880px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 10;
+        }
+        
+        /* ===== INFO BOXES ===== */
+        .info-box {
+            background: var(--bg-color-box);
+            border-radius: 15px;
+            padding: 12px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
+            position: relative;
+            min-height: 60px; /* Hauteur minimale pour éviter l'écrasement */
+        }
+
+        h3 {
+            margin: 0 0 8px 0;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-color-accent);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .historical-box h3, .last-draw-box h3, .chart-box h3 {
+            justify-content: center;
+            text-align: center;
+        }
+
+        /* ===== GRID PLACEMENT FOR DESKTOP ===== */
+        .burned-box { grid-column: 1 / span 3; grid-row: 1; }
+        .pool-box { grid-column: 4 / span 4; grid-row: 1; }
+        .countdown-box { grid-column: 8 / span 2; grid-row: 1; }
+        .balance-box { grid-column: 10 / span 3; grid-row: 1 / span 2; }
+        .historical-box { 
+            grid-column: 1 / span 3; 
+            grid-row: 2 / span 4; 
+            overflow-y: auto;
+            overflow-x: hidden; 
+            position: relative;
+            min-height: 300px; /* Hauteur minimale spécifique pour Historical Winners */
+        }
+        .last-draw-box { grid-column: 4 / span 4; grid-row: 2 / span 3; }
+        .stats-box { grid-column: 8 / span 2; grid-row: 2; }
+        .participants-box { 
+            grid-column: 8 / span 5; 
+            grid-row: 3 / span 3; 
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        .chart-box { 
+            grid-column: 4 / span 4; 
+            grid-row: 5 / span 1; 
+        }
+        
+        /* ===== BOX LAYOUTS ===== */
+        .last-draw-box, .chart-box, .historical-box {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .burned-box, .pool-box, .countdown-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .burned-amount, .pool-amount, .countdown-timer {
+            font-size: 17px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-align: center; 
+        }
+
+        .pool-amount p:first-child {
+            margin: 0;
+        }
+
+        /* Target the LAST <p> element (the cap note) */
+        .pool-amount p:last-child {
+            font-size: 0.5em;
+            margin: 0; 
+            color: var(--text-color-light);
+            opacity: 0.8; 
+        }
+        
+        .countdown-timer {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .stats-box p, .balance-box p, .last-draw-box p {
+            margin: 4px 0;
+            line-height: 1.4;
+        }
+        
+        /* ===== TICKET BUYING SECTION ===== */
+        .buy-section {
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .buy-section label {
+            display: block;
+            font-size: 16px;
+            margin-bottom: 4px;
+            flex-basis: 100%;
+        }
+        
+        .buy-section input {
+            width: 60px;
+            padding: 6px;
+            border-radius: 8px;
+            border: none;
+            outline: none;
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-color-light);
+            text-align: center;
+        }
+        
+        .total-buy {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+        
+        .total-buy span { font-weight: bold; }
+        .total-buy button {
+            width: auto;
+            padding: 6px 14px;
+            border-radius: 15px;
+        }
+        
+        .your-tickets-box {
+            margin-top: 8px;
+            padding: 6px 10px;
+            background: linear-gradient(270deg, rgba(104, 115, 129, 0.8), rgba(110, 114, 117, 0.8));
+            text-align: center;
+            font-size: 13px;
+            font-weight: 600;
+            color: #f7f0e2;
+        }
+
+        /* ===== TABLES & SCROLLBARS ===== */
+        .list-table-box, .chart-wrapper, .historical-box {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(217, 223, 229, 0.3) rgba(81, 100, 118, 0.3);
+        }
+
+        .list-table-box::-webkit-scrollbar, .chart-wrapper::-webkit-scrollbar, .historical-box::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        .list-table-box::-webkit-scrollbar-thumb, .chart-wrapper::-webkit-scrollbar-thumb, .historical-box::-webkit-scrollbar-thumb {
+            background-color: rgba(217, 223, 229, 0.3);
+            border-radius: 3px;
+        }
+
+        .list-table-box::-webkit-scrollbar-track, .chart-wrapper::-webkit-scrollbar-track, .historical-box::-webkit-scrollbar-track {
+            background-color: rgba(81, 100, 118, 0.3);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        
+        table th, table td {
+            padding: 6px 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        table th {
+            color: var(--text-color-accent);
+        }
+        
+        table tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .last-draw-box p { word-break: break-word; }
+        
+        .last-draw-box a {
+            color: var(--color-link);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .last-draw-box a:hover { text-decoration: underline; }
+
+        /* ===== CHART STYLES ===== */
+        .legend-box {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 12px;
+            color: #d9dfe5;
+        }
+        
+        .legend-color {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .participants-color { background-color: rgb(75, 192, 192); }
+        .tickets-color { background-color: rgb(255, 99, 132); }
+        
+        .loading-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #f9f8f5;
+            font-size: 1.2em;
+            z-index: 2;
+            text-align: center;
+            width: 100%;
+            padding: 0 10px;
+        }
+
+        .historical-box .loading-message {
+            font-size: 1.1em;
+        }
+        
+        .chart-wrapper {
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding-bottom: 5px;
+            height: 100%;
+        }
+        
+        .chart-container { 
+            flex-grow: 1;
+            display: flex;
+            align-items: flex-end;
+            min-height: 200px;
+        }
+        
+        canvas#evolutionChart {
+            width: auto;
+            max-width: none;
+        }
+        
+        /* ===== POPUPS AND OVERLAYS ===== */
+        #walletPopup, #popupOverlay, #loader, #errorPopup {
+            position: fixed;
+            z-index: 1000;
+        }
+        
+        #walletPopup {
+            display: none;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-color-main);
+            padding: 20px;
+            border-radius: 15px;
+            min-width: 250px;
+            box-shadow: 0 0 15px 3px #6C7A89;
+        }
+        
+        #walletPopup button {
+            display: block;
+            margin: 10px 0;
+            padding: 10px;
+            width: 100%;
+            cursor: pointer;
+            border-radius: 10px;
+            border: none;
+            background: var(--bg-color-gradient-dark);
+            color: var(--text-color-light);
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        
+        #walletPopup button:hover { background: #6C7A89; }
+        
+        #popupOverlay {
+            display: none;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+        }
+        
+        #loader {
+            display: none;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            font-size: 2em;
+            text-align: center;
+            padding-top: 20%;
+        }
+
+        #errorPopup {
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--color-error);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            display: none;
+            font-family: sans-serif;
+            font-size: 14px;
+            text-align: center;
+        }
+        
+        /* ===== TOOLTIP ===== */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+            background-color: var(--color-success);
+            border: 1px solid var(--color-tooltip-border);
+            border-radius: 50%;
+            text-align: center;
+            line-height: 18px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 220px;
+            background-color: var(--color-tooltip-bg);
+            color: var(--text-color-light);
+            text-align: center;
+            border-radius: 6px;
+            border: 1px solid var(--color-tooltip-border);
+            padding: 5px;
+            position: absolute;
+            top: 100%;
+            margin-top: 5px;
+            z-index: 1000;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 12px;
+            pointer-events: none;
+        }
+
+        .tooltip .tooltiptext::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: var(--color-tooltip-bg) transparent transparent transparent;
+        }
+        
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* ===== RESPONSIVE ADJUSTMENTS ===== */
+        /* Large screens (default) - no changes needed */
+        
+        /* Medium screens (tablets and smaller desktops) */
+        @media (max-width: 1400px) {
+            main {
+                max-width: 100%;
+                padding: 15px;
+            }
+            
+            .button, .total-buy button {
+                width: 180px;
+                padding: 9px 20px;
+            }
+            
+            .page-title {
+                font-size: 20px;
+            }
+            
+            .page-logo {
+                width: 50px;
+            }
+        }
+        
+        /* Tablets and small laptops */
+        @media (max-width: 1200px) {
+            header nav {
+                flex-direction: column;
+                align-items: center;
+                padding: 10px;
+                gap: 4px; 
+            }
+            
+            main {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto;
+                gap: 10px;
+            }
+            
+            /* NOUVELLE ORGANISATION POUR MOBILE/TABLETTE */
+            .burned-box { order: 1; }
+            .pool-box { order: 2; }
+            .countdown-box { order: 3; }
+            .balance-box { order: 4; }
+            .stats-box { order: 5; }           
+            .participants-box { order: 6; }
+            .last-draw-box { order: 7; }
+            .chart-box { order: 8; }
+            .historical-box { order: 9; }
+            
+            .burned-box, .pool-box, .countdown-box, .balance-box, .historical-box, 
+            .last-draw-box, .stats-box, .participants-box, .chart-box {
+                grid-column: 1 / -1;
+                grid-row: auto;
+            }
+            
+            /* CENTRER LES TITRES SPÉCIFIQUES */
+            .stats-box h3,
+            .balance-box h3,
+            .participants-box h3 {
+                justify-content: center;
+                text-align: center;
+            }
+            
+            /* Hauteurs minimales pour mobile/tablette */
+            .info-box {
+                min-height: 80px;
+            }
+            
+            .historical-box {
+                min-height: 250px;
+            }
+            
+            #how-it-works-link { 
+                margin-top: 4px;
+                order: 3;
+            }
+
+            .page-title-container {
+                position: static;
+                transform: none;
+                margin-bottom: 0px;
+                order: 1;
+                flex-direction: row;
+                gap: 12px;
+            }
+            
+            .button {
+                order: 2;
+                margin-top: 4px; 
+            }
+
+            .button, 
+            .total-buy button,
+            #connectButton, 
+            #buyButton {
+                -webkit-tap-highlight-color: transparent;
+                outline: none;
+            }
+
+            .chart-wrapper {
+                height: 250px;
+            }
+            
+            .total-buy {
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+            
+            .total-buy button {
+                width: 100%;
+            }
+
+            /* MODIFICATIONS POUR LE FORMULAIRE DE BILLETS */
+            .buy-section {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+                gap: 10px;
+            }
+            
+            .buy-section label {
+                margin-bottom: 0;
+                flex: 1;
+                white-space: nowrap;
+            }
+            
+            .buy-section input {
+                width: 80px;
+                flex: none;
+            }
+
+            .total-buy {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+                gap: 10px;
+            }
+            
+            .total-buy button {
+                width: auto;
+                padding: 8px 16px;
+                flex: none;
+            }
+
+            .floating-logo {
+                width: 100px;
+            }
+        }
+        
+        /* Mobile devices */
+        @media (max-width: 768px) {
+            body {
+                min-height: 200vh; 
+            }
+
+            header nav {
+                padding: 8px;
+                gap: 3px; 
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .burned-box { order: 1; }
+            .pool-box { order: 2; }
+            .countdown-box { order: 3; }
+            .balance-box { order: 4; }
+            .stats-box { order: 5; }            
+            .participants-box { order: 6; }
+            .last-draw-box { order: 7; }
+            .chart-box { order: 8; }
+            .historical-box { order: 9; }
+
+            .page-title-container {
+                flex-direction: row;
+                gap: 10px;
+                margin-bottom: 0; 
+                order: 1; 
+            }
+            
+            .page-title {
+                font-size: 20px;
+                text-align: center;
+                white-space: nowrap;
+            }
+            
+            .page-logo {
+                width: 60px;
+                opacity: 0.9;
+            }
+            
+            .button, .total-buy button {
+                width: 200px;
+                padding: 9px 15px;
+                font-size: 14px;
+                order: 2; 
+                margin-top: 4px;
+                -webkit-tap-highlight-color: transparent;
+                outline: none;
+            }
+
+            #how-it-works-link {
+                order: 3; 
+                margin-top: 4px;
+            }
+            
+            main {
+                padding: 10px;
+                gap: 8px;
+                display: flex;
+                flex-direction: column;
+            }
+            
+            /* CENTRER LES TITRES SPÉCIFIQUES */
+            .stats-box h3,
+            .balance-box h3,
+            .participants-box h3 {
+                justify-content: center;
+                text-align: center;
+            }
+            
+            /* Hauteurs minimales pour mobile */
+            .info-box {
+                min-height: 70px;
+            }
+            
+            .historical-box {
+                min-height: 200px;
+            }
+
+            .participants-box,
+            .historical-box {
+                max-height: 350px !important; /* ou la hauteur que tu veux */
+            }
+            
+            .info-box {
+                padding: 10px;
+            }
+            
+            h3 {
+                font-size: 14px;
+            }
+            
+            .burned-amount, .pool-amount, .countdown-timer {
+                font-size: 16px;
+            }
+            
+            .countdown-timer {
+                font-size: 18px;
+            }
+            
+            /* MODIFICATIONS POUR LE FORMULAIRE DE BILLETS */
+            .buy-section {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+                gap: 10px;
+            }
+            
+            .buy-section label {
+                margin-bottom: 0;
+                flex: 1;
+                white-space: nowrap;
+            }
+            
+            .buy-section input {
+                width: 70px;
+                flex: none;
+            }
+
+            .total-buy {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+                gap: 10px;
+            }
+            
+            .total-buy button {
+                width: auto;
+                padding: 8px 16px;
+                flex: none;
+            }
+            
+            .legend-box {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .floating-logo {
+                width: 80px;
+            }
+            
+            table {
+                font-size: 12px;
+            }
+            
+            table th, table td {
+                padding: 4px 6px;
+            }
+        }
+        
+        /* Small mobile devices */
+        @media (max-width: 480px) {
+            body {
+                min-height: 250vh; 
+            }
+
+            header nav {
+                padding: 5px;
+                flex-direction: column;
+                align-items: center;
+                gap: 3px; 
+            }
+
+            .burned-box { order: 1; }
+            .pool-box { order: 2; }
+            .countdown-box { order: 3; }
+            .balance-box { order: 4; }
+            .stats-box { order: 5; }            
+            .participants-box { order: 6; }
+            .last-draw-box { order: 7; }
+            .chart-box { order: 8; }
+            .historical-box { order: 9; }
+
+            .page-title-container {
+                flex-direction: row;
+                gap: 8px;
+                margin-bottom: 0;
+                order: 1;
+            }
+            
+            .page-title {
+                font-size: 18px;
+                white-space: nowrap;
+            }
+            
+            .page-logo {
+                width: 50px;
+            }
+            
+            .button, .total-buy button {
+                width: 200px;
+                padding: 9px 20px;
+                font-size: 14px;
+                order: 2;
+                margin-top: 4px;
+                -webkit-tap-highlight-color: transparent;
+                outline: none;
+            }
+
+            #how-it-works-link {
+                order: 3;
+                margin-top: 4px;
+            }
+            
+            main {
+                padding: 8px;
+                gap: 6px;
+                display: flex;
+                flex-direction: column;
+            }
+            
+            /* CENTRER LES TITRES SPÉCIFIQUES */
+            .stats-box h3,
+            .balance-box h3,
+            .participants-box h3 {
+                justify-content: center;
+                text-align: center;
+            }
+            
+            /* Hauteurs minimales pour petits mobiles */
+            .info-box {
+                min-height: 60px;
+            }
+            
+            .historical-box {
+                min-height: 180px;
+            }
+
+            .participants-box,
+            .historical-box {
+                max-height: 250px !important; 
+            }
+            
+            .info-box {
+                padding: 8px;
+            }
+            
+            h3 {
+                font-size: 13px;
+            }
+            
+            .burned-amount, .pool-amount, .countdown-timer {
+                font-size: 14px;
+            }
+            
+            .countdown-timer {
+                font-size: 16px;
+            }
+            
+            .stats-box p, .balance-box p, .last-draw-box p {
+                font-size: 14px;
+            }
+
+            /* MODIFICATIONS POUR LE FORMULAIRE DE BILLETS */
+            .buy-section {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+                gap: 8px;
+            }
+            
+            .buy-section label {
+                margin-bottom: 0;
+                flex: 1;
+                white-space: nowrap;
+                font-size: 14px;
+            }
+            
+            .buy-section input {
+                width: 60px;
+                flex: none;
+                font-size: 13px;
+            }
+
+            .total-buy {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+                gap: 8px;
+            }
+            
+            .total-buy button {
+                width: auto;
+                padding: 7px 14px;
+                flex: none;
+                font-size: 13px;
+            }
+            
+            .floating-logo {
+                width: 100px;
+            }
+            
+            table {
+                font-size: 11px;
+            }
+            
+            #walletPopup {
+                min-width: 200px;
+                padding: 15px;
+            }
+        }
+        
+        /* Very small mobile devices */
+        @media (max-width: 360px) {
+            header nav {
+                gap: 2px; 
+                padding: 3px 5px; 
+            }
+
+            .page-title-container {
+                flex-direction: row;
+                gap: 6px;
+                margin-bottom: 0;
+                order: 1;
+            }
+            
+            .page-title {
+                font-size: 16px;
+                white-space: nowrap;
+            }
+            
+            .page-logo {
+                width: 45px;
+            }
+            
+            .button, .total-buy button {
+                width: 200px;
+                padding: 8px 16px;
+                font-size: 13px;
+                order: 2;
+                margin-top: 4px;
+                -webkit-tap-highlight-color: transparent;
+                outline: none;
+            }
+
+            #how-it-works-link {
+                order: 3;
+                margin-top: 4px;
+            }
+            
+            main {
+                display: flex;
+                flex-direction: column;
+            }
+
+            .burned-box { order: 1; }
+            .pool-box { order: 2; }
+            .countdown-box { order: 3; }
+            .balance-box { order: 4; }
+            .stats-box { order: 5; }            
+            .participants-box { order: 6; }
+            .last-draw-box { order: 7; }
+            .chart-box { order: 8; }
+            .historical-box { order: 9; }
+            
+            /* CENTRER LES TITRES SPÉCIFIQUES */
+            .stats-box h3,
+            .balance-box h3,
+            .participants-box h3 {
+                justify-content: center;
+                text-align: center;
+            }
+            
+            /* Hauteurs minimales pour très petits mobiles */
+            .info-box {
+                min-height: 50px;
+            }
+            
+            .historical-box {
+                min-height: 150px;
+            }
+
+            .participants-box,
+            .historical-box {
+                max-height: 200px !important; 
+            }
+            
+            .floating-logo {
+                width: 50px;
+            }
+
+            /* MODIFICATIONS POUR LE FORMULAIRE DE BILLETS */
+            .buy-section {
+                gap: 6px;
+            }
+            
+            .buy-section label {
+                font-size: 13px;
+            }
+            
+            .buy-section input {
+                width: 55px;
+                font-size: 12px;
+            }
+
+            .total-buy {
+                gap: 6px;
+            }
+            
+            .total-buy button {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header with navigation -->
+    <header>
+        <nav>
+            <a href="guide.html" target="_blank" id="how-it-works-link">How it works?</a>
+            <div class="page-title-container">
+                <img src="inky-logo.png" alt="INKY-Logo" class="page-logo">
+                <div class="page-title" id="pageTitle">
+                    The INKY Tombola: Round <span id="currentRound">-</span>
+                </div>
+            </div>
+            <button class="button" id="connectButton">Connect your wallet</button>
+        </nav>
+    </header>
+
+    <!-- Main content with grid layout -->
+    <main>
+        <!-- Burned INKY section -->
+        <div class="info-box burned-box">
+            <h3>🔥 All-Time $INKY Burned</h3>
+            <div class="burned-amount" id="totalInkyBurnedEver">-</div>
+        </div>
+        
+        <!-- Current pool section -->
+        <div class="info-box pool-box">
+            <h3>💎 Current Round Pool *</h3>
+            <div class="pool-amount" id="currentRoundPool">
+                <p><span id="externalWalletBalance">-</span> $INKY</p>
+                <p>* The maximum prize is capped at <span id="maxCap">-</span> $INKY. Any surplus will be burned.</p>
+            </div>
+        </div>
+        
+        <!-- Countdown section -->
+        <div class="info-box countdown-box">
+            <h3>⏳ Next Draw Countdown</h3>
+            <div class="countdown-timer" id="countdown">00:00:00:00</div>
+        </div>
+        
+        <!-- Stats section -->
+        <div class="info-box stats-box">
+            <h3>📊 Current Round Stats</h3>
+            <p>Participants: <span id="totalParticipants">-</span></p>
+            <p>Tickets sold: <span id="totalTickets">-</span></p>
+            <p>$INKY burned: <span id="totalInkyBurned">-</span></p>
+        </div>
+        
+        <!-- User balance and ticket purchase section -->
+        <div class="info-box balance-box">
+            <h3>💰 Your Balance</h3>
+            <p>Balance: <span id="inkyBalance">-</span> $INKY</p>
+            <p>Status: <span id="status">-</span></p>
+            <p style="display:flex; align-items:center; gap:6px;">
+                Max tickets allowed: <span id="maxTickets">-</span>
+                <span class="tooltip">i
+                    <span class="tooltiptext">
+                        Your ticket limit grows with your INKY balance x.<br><br>
+                        x &lt;10k → 0 Ticket<br>
+                        10k &lt; x &lt;100k → 1 Ticket<br>
+                        100k &lt; x &lt;300k → 2 Ticket<br>
+                        300k &lt; x &lt;500k → 3 Ticket<br>
+                        500k &lt; x &lt;700k → 4 Ticket<br>
+                        700k &lt; x &lt;1M → 5 Ticket<br>
+                        1M &lt; x &lt;2M → 6 Ticket<br>
+                        2M &lt; x → 7 Ticket
+                    </span>
+                </span>
+            </p>
+            
+            <div class="buy-section">
+                <label for="ticketCount">Number of tickets</label>
+                <input type="number" id="ticketCount" min="0" max="7" value="0" 
+                    oninput="if(this.value>7)this.value=7" onchange="if(this.value>7)this.value=7" />
+            </div>
+            <div class="total-buy">
+                <span>Total price: <span id="totalPrice">-</span> $INKY</span>
+                <button id="buyButton">Buy Tickets</button>
+            </div>
+            <div class="your-tickets-box">
+                You are currently holding <span id="yourTickets">-</span> tickets
+            </div>
+        </div>
+        
+        <!-- Participants table -->
+        <div class="info-box participants-box list-table-box">
+            <h3 id="participants-title">📋 List of participants</h3>
+            <div class="loading-message">
+                Loading data...
+            </div>
+
+            <table id="participantsTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Wallet</th>
+                        <th>Tickets</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Last draw information -->
+        <div class="info-box last-draw-box">
+            <h3>🎲 Last Draw Informations</h3>
+            <div class="draw-info">
+                <p>Round n°: <span id="lastRound">-</span></p>
+                <p>Total Tickets: <span id="lastTotalTickets">-</span></p>
+                <p>Number of Participants: <span id="lastParticipants">-</span></p>
+                <p>Last Winner: <span class="winner-address" id="lastWinner">-</span></p>
+                <p>TxHash: <span id="lastTxHash">-</span></p>
+                <p>Amount: <span id="lastAmount">-</span></p>
+                <p>Burned: <span id="lastBurned">-</span></p>
+                <p>Reference Draw Date (UTC): <span id="lastDrawDate">-</span></p>
+                <p>Report: <span id="previousRoundReportLink">-</span></p>
+            </div>
+        </div>
+        
+        <!-- Chart section -->
+        <div class="info-box chart-box">
+            <h3>📈 Participants & Tickets Evolution</h3>
+            <div class="legend-box">
+                <div class="legend-item">
+                    <span class="legend-color participants-color"></span>
+                    Participants
+                </div>
+                <div class="legend-item">
+                    <span class="legend-color tickets-color"></span>
+                    Tickets
+                </div>
+            </div>
+            <div class="loading-message chart-loading-message">
+                Loading data...
+            </div>
+            <div class="chart-wrapper">
+                <div class="chart-container">
+                    <canvas id="evolutionChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Historical winners table -->
+        <div class="info-box historical-box list-table-box">
+            <h3>🏆 Historical Winners</h3>
+            <div class="loading-message historical-loading-message">
+                Loading data...
+            </div>
+            <table id="historicalTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Wallet</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- Popups and overlays -->
+    <div id="popupOverlay"></div>
+    <div id="walletPopup"></div>
+    <div id="loader"></div>
+    <div id="errorPopup"></div>
+    
+    <!-- Floating logos for background decoration -->
+    <img src="NXRA-logo.png" class="floating-logo" style="top:5%;left:10%; animation-delay:0s;">
+    <img src="inky-logo.png" class="floating-logo" style="top:20%;left:30%; animation-delay:2s;">
+    <img src="NXRA-logo.png" class="floating-logo" style="top:35%;left:50%; animation-delay:4s;">
+    <img src="inky-logo.png" class="floating-logo" style="top:50%;left:70%; animation-delay:6s;">
+    <img src="NXRA-logo.png" class="floating-logo" style="top:65%;left:20%; animation-delay:1s;">
+    <img src="inky-logo.png" class="floating-logo" style="top:70%;left:50%; animation-delay:3s;">
+    <img src="inky-logo.png" class="floating-logo" style="top:10%;left:60%; animation-delay:5s;">
+    <img src="NXRA-logo.png" class="floating-logo" style="top:25%;left:80%; animation-delay:7s;">
+    <img src="NXRA-logo.png" class="floating-logo" style="top:40%;left:15%; animation-delay:2.5s;">
+    <img src="inky-logo.png" class="floating-logo" style="top:55%;left:35%; animation-delay:4.5s;">
+    <img src="NXRA-logo.png" class="floating-logo" style="top:70%;left:80%; animation-delay:6.5s;">
+    <img src="inky-logo.png" class="floating-logo" style="top:70%;left:6%; animation-delay:8s;">
+
+    <!-- External libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+
+    <!-- Main application script -->
+    <script>
+        // ===== APPLICATION INITIALIZATION =====
+        document.addEventListener('DOMContentLoaded', async () => {
+            // ===== CONSTANTS AND VARIABLES =====
+            const button = document.getElementById('connectButton');
+            const popup = document.getElementById('walletPopup');
+            const overlay = document.getElementById('popupOverlay');
+            const ticketInput = document.getElementById('ticketCount');
+            const maxTicketsEl = document.getElementById('maxTickets');
+            const totalPriceEl = document.getElementById('totalPrice');
+            const buyButton = document.getElementById('buyButton');
+            const yourTicketsEl = document.getElementById('yourTickets');
+            const EXTERNAL_WALLET = "0x20dd4f9857A737E4b762bB8857499e22CdA70Edc";
+            const EXPLORER_BASE_URL = "https://explorer.testnet.nexera.network/tx/";
+
+            let lastAccount = null;
+            let balanceInterval = null;
+            let updatingParticipants = false;
+            let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
+
+            // Contract addresses and ABIs
+            const INKY_ADDRESS = "0x6EB2C1fE4e3B48af4905A0209658810B61343438";
+            const INKY_ABI = [
+                "function balanceOf(address) view returns (uint256)",
+                "function decimals() view returns (uint8)",
+                "function symbol() view returns (string)"
+            ];
+
+            const TICKET_SALE_ADDRESS = "0xF494Ba7706A556D9af11E9eF5bf2E20F05F4Da33";
+            const TICKET_SALE_ABI = [
+                "function buyTickets(uint256 _amount) external",
+                "function ticketsBought(uint256 _roundId, address _user) view returns (uint256)",
+                "function getMaxTicketsAllowed(address _user) view returns (uint256)",
+                "function minBalanceToParticipate() view returns (uint256)",
+                "function currentRoundId() view returns (uint256)",
+                "function getParticipants(uint256 _roundId) view returns (address[])",
+                "function getParticipantCount(uint256 _roundId) view returns (uint256)",
+                "function ticketPrice() view returns (uint256)",
+                "function totalTicketsPerRound(uint256 _roundId) view returns (uint256)",
+                "function totalCostPerRound(uint256 _roundId) view returns (uint256)",
+                "function getBurnedTotalINKY() view returns (uint256)",
+                "function maxBountyAmountINKY() view returns (uint256)"
+            ];
+
+            // Initialize providers and contracts
+            const readProvider = new ethers.JsonRpcProvider("https://rpc.testnet.nexera.network");
+            const inkyContract = new ethers.Contract(INKY_ADDRESS, INKY_ABI, readProvider);
+            const ticketSaleRead = new ethers.Contract(TICKET_SALE_ADDRESS, TICKET_SALE_ABI, readProvider);
+
+            let ticketPrice = 500;
+            let roundId = 1;
+
+            // ===== UTILITY FUNCTIONS =====
+            
+            /**
+             * Safely executes a promise and returns a default value if it fails
+             */
+            async function safeCall(promise, defaultValue = null) {
+                try { 
+                    return await promise; 
+                } catch (e) { 
+                    console.error("SafeCall error:", e); 
+                    return defaultValue; 
+                }
+            }
+
+            /**
+             * Shows a loading message
+             */
+            function showLoading(msg) { 
+                const loader = document.getElementById("loader"); 
+                loader.innerHTML = msg; 
+                loader.style.display = "block"; 
+            }
+
+            /**
+             * Hides the loading message
+             */
+            function hideLoading() { 
+                document.getElementById("loader").style.display = "none"; 
+            }
+
+            /**
+             * Shows an error message
+             */
+            function showError(message, duration = 4000) {
+                const popup = document.getElementById("errorPopup");
+                popup.textContent = message;
+                popup.style.display = "block";
+                popup.style.opacity = 1;
+                setTimeout(() => {
+                    popup.style.transition = "opacity 0.5s";
+                    popup.style.opacity = 0;
+                    setTimeout(() => { 
+                        popup.style.display = "none"; 
+                        popup.style.transition = ""; 
+                    }, 500);
+                }, duration);
+            }
+
+            /**
+             * Updates the total price based on selected tickets
+             */
+            function updateTotalPrice() {
+                if (!lastAccount) {
+                    totalPriceEl.textContent = "-";
+                    return;
+                }
+                let ticketCount = parseInt(ticketInput.value);
+                if(isNaN(ticketCount) || ticketCount < 0) ticketCount = 0;
+                totalPriceEl.textContent = ticketCount * ticketPrice;
+            }
+
+            // ===== DATA FETCHING FUNCTIONS =====
+
+            /**
+             * Fetches and displays the last winner information
+             */
+            async function fetchWinner() {
+                try {
+                    const response = await fetch('http://localhost:3000/winners');
+                    
+                    if (!response.ok) {
+                        throw new Error(`Cannot fetch winners: ${response.statusText}`);
+                    }
+                    
+                    const winners = await response.json();
+
+                    if (winners.length === 0) {
+                        console.log("No winners found.");
+                        document.getElementById('previousRoundReportLink').textContent = "-";
+                        return;
+                    }
+
+                    const data = winners[0];
+
+                    if (data.roundId) document.getElementById('lastRound').textContent = data.roundId;
+                    if (data.winner) document.getElementById('lastWinner').textContent = data.winner;
+                    if (data.totalTickets !== undefined) document.getElementById('lastTotalTickets').textContent = data.totalTickets;
+                    if (data.numberOfParticipants !== undefined) document.getElementById('lastParticipants').textContent = data.numberOfParticipants;
+                    if (data.bountyTxHash) {
+                        document.getElementById('lastTxHash').innerHTML = 
+                        `<a href="${EXPLORER_BASE_URL}${data.bountyTxHash}" target="_blank" rel="noopener noreferrer">${data.bountyTxHash}</a>`;
+                    } else {
+                        document.getElementById('lastTxHash').textContent = "-";
+                    }
+                    if (data.prizeAmount !== undefined) document.getElementById('lastAmount').textContent = data.prizeAmount;
+                    if (data.burnAmount !== undefined) document.getElementById('lastBurned').textContent = data.burnAmount;
+                    if (data.drawDateUTC !== undefined) document.getElementById('lastDrawDate').textContent = data.drawDateUTC;
+                    
+                    // PDF REPORT HANDLING - Use the last winner's roundId for the report
+                    const lastWinnerRound = data.roundId ? Number(data.roundId) : 0;
+                    const reportElement = document.getElementById('previousRoundReportLink');
+
+                    if (lastWinnerRound > 0) {
+                        const pdfPath = `Draw/archives_rounds_pdf/INKY_Tombola_report_${lastWinnerRound}.pdf`;
+                        // Transform the span into a hyperlink
+                        reportElement.outerHTML = `<a href="${pdfPath}" target="_blank">Report (PDF)</a>`;
+                    } else {
+                        reportElement.textContent = "-";
+                    }
+                    
+                } catch (err) {
+                    console.error("Error fetching winner:", err);
+                    document.getElementById('previousRoundReportLink').textContent = "-";
+                }
+            }
+
+            /**
+             * Updates the current round statistics
+             */
+            async function updateStats(currentRoundId) {
+                roundId = currentRoundId;
+                const [
+                    totalParticipants,
+                    totalTicketsBN,
+                    totalCostBN,
+                    burnedEverBN,
+                    poolBalanceBN,
+                    maxBountyAmountBN,
+                    decimals
+                ] = await Promise.all([
+                    safeCall(ticketSaleRead.getParticipantCount(roundId), 0),
+                    safeCall(ticketSaleRead.totalTicketsPerRound(roundId), 0),
+                    safeCall(ticketSaleRead.totalCostPerRound(roundId), 0),
+                    safeCall(ticketSaleRead.getBurnedTotalINKY(), 0),
+                    safeCall(inkyContract.balanceOf(EXTERNAL_WALLET), 0),
+                    safeCall(ticketSaleRead.maxBountyAmountINKY(), 0),
+                    safeCall(inkyContract.decimals(), 18)
+                ]);
+
+                const totalCost = parseFloat(ethers.formatUnits(totalCostBN, decimals));
+                const burnedEver = parseFloat(ethers.formatUnits(burnedEverBN, decimals)); 
+                const poolBalance = parseFloat(ethers.formatUnits(poolBalanceBN, decimals));
+                const maxamount = parseFloat(ethers.formatUnits(maxBountyAmountBN, 0));
+
+                document.getElementById("totalParticipants").textContent = parseInt(totalParticipants?.toString() || "0");
+                document.getElementById("totalTickets").textContent = parseInt(totalTicketsBN?.toString() || "0");
+                document.getElementById("totalInkyBurned").textContent = totalCost.toLocaleString("en-US");
+                document.getElementById("totalInkyBurnedEver").textContent = burnedEver.toLocaleString("en-US");
+                document.getElementById("externalWalletBalance").textContent = (+poolBalance === 0 ? "0" : poolBalance.toLocaleString("en-US"));
+                document.getElementById("maxCap").textContent = maxamount.toLocaleString("en-US");
+                document.getElementById("currentRound").textContent = roundId;
+            }
+
+            /**
+             * Updates the participants table
+             */
+            async function updateParticipantsTable(currentRoundId) {
+                if (updatingParticipants) return;
+                updatingParticipants = true;
+
+                const participantsBox = document.querySelector('.participants-box');
+                const loadingMessage = participantsBox.querySelector('.loading-message');
+                const participantsTable = participantsBox.querySelector('#participantsTable');
+                const tbody = participantsTable.querySelector('tbody');
+
+                try {
+                    const participants = await safeCall(ticketSaleRead.getParticipants(currentRoundId), []);
+
+                    if (loadingMessage && participantsTable) {
+                        loadingMessage.style.display = 'none';
+                        participantsTable.style.display = 'table';
+                    }
+
+                    // If the list is empty, show "No participants yet" message and exit
+                    if (!participants || participants.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; opacity:0.7;">No participants yet</td></tr>`;
+                        return;
+                    }
+
+                    // Check if the table contains the "No participants yet" message
+                    const noParticipantsMessage = tbody.querySelector('td[colspan="3"]');
+
+                    // If the message is present and there are participants, clear the table
+                    if (noParticipantsMessage && participants.length > 0) {
+                        tbody.innerHTML = '';
+                    }
+                    
+                    const chunkSize = 100;
+                    const frag = document.createDocumentFragment();
+                    const existingRows = new Map();
+                    
+                    tbody.querySelectorAll('tr').forEach(row => {
+                        if (row.dataset.addr) {
+                            existingRows.set(row.dataset.addr, row);
+                        }
+                    });
+
+                    let id = 1;
+                    for (let i = 0; i < participants.length; i += chunkSize) {
+                        const chunk = participants.slice(i, i + chunkSize);
+                        const ticketsBNs = await Promise.all(chunk.map(addr => safeCall(ticketSaleRead.ticketsBought(currentRoundId, addr), 0)));
+
+                        chunk.forEach((addr, j) => {
+                            const tickets = parseInt(ticketsBNs[j]?.toString() || '0');
+                            
+                            if (existingRows.has(addr)) {
+                                const row = existingRows.get(addr);
+                                const ticketCell = row.querySelector("td:nth-child(3)");
+                                if (ticketCell.textContent !== tickets.toString()) {
+                                    ticketCell.textContent = tickets;
+                                }
+                                existingRows.delete(addr);
+                            } else {
+                                const tr = document.createElement("tr");
+                                tr.dataset.addr = addr;
+                                tr.innerHTML = `
+                                    <td><span class="id-cell">${id}</span></td>
+                                    <td title="${addr}">${addr.substring(0,6)}...${addr.slice(-4)}</td>
+                                    <td style="font-weight:600;">${tickets}</td>
+                                `;
+                                frag.appendChild(tr);
+                            }
+                            id++;
+                        });
+                    }
+                    
+                    if (frag.children.length > 0) {
+                        tbody.appendChild(frag);
+                    }
+                } catch (err) {
+                    console.error("Failed to update participants table:", err);
+                    if (loadingMessage) {
+                        loadingMessage.textContent = 'Failed to load data.';
+                        loadingMessage.style.color = 'red';
+                        loadingMessage.style.display = 'block';
+                    }
+                    if (participantsTable) participantsTable.style.display = 'none';
+                } finally {
+                    updatingParticipants = false;
+                }
+            }
+
+            /**
+             * Updates the historical winners table
+             */
+            async function updateWinnersTable() {
+                const historicalBox = document.querySelector('.historical-box');
+                // Specifically target the winners table loading message
+                const loadingMessage = historicalBox.querySelector('.historical-loading-message');
+                const historicalTable = historicalBox.querySelector('#historicalTable');
+                const tbody = historicalTable.querySelector('tbody');
+
+                try {
+                    const response = await fetch('http://localhost:3000/winners');
+                    if (!response.ok) {
+                        if (loadingMessage) {
+                            loadingMessage.textContent = 'Failed to load data.';
+                            loadingMessage.style.color = 'red';
+                            loadingMessage.style.display = 'block';
+                        }
+                        if (historicalTable) historicalTable.style.display = 'none';
+                        throw new Error(`Cannot fetch winners: ${response.statusText}`);
+                    }
+                    
+                    const winners = await response.json();
+
+                    if (loadingMessage) loadingMessage.style.display = 'none';
+                    if (historicalTable) historicalTable.style.display = 'table';
+                    
+                    tbody.innerHTML = '';
+
+                    if (winners.length === 0) {
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `<td colspan="3" style="text-align:center; opacity:0.7;">No winners yet</td>`;
+                        tbody.appendChild(tr);
+                        return;
+                    }
+
+                    winners.forEach(winner => {
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `
+                            <td><span class="addr-abbr" title="${winner.winner}">${winner.winner.substring(0, 6)}...${winner.winner.slice(-4)}</span></td>
+                            <td>${parseInt(winner.prizeAmount)}</td>
+                            <td>${new Date(winner.drawDateUTC).toLocaleDateString()}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } catch (err) {
+                    console.error("Failed to update winners table:", err);
+                    if (loadingMessage) {
+                        loadingMessage.textContent = 'Failed to load data.';
+                        loadingMessage.style.color = 'red';
+                        loadingMessage.style.display = 'block';
+                    }
+                    if (historicalTable) historicalTable.style.display = 'none';
+                }
+            }
+
+            /**
+             * Updates the user's balance and status
+             */
+            async function updateBalance(account) {
+                if (!account) {
+                    document.getElementById("inkyBalance").textContent = "-";
+                    maxTicketsEl.textContent = "-";
+                    yourTicketsEl.textContent = "-";
+                    document.getElementById("status").textContent = "-";
+                    document.getElementById("status").style.color = "#fff";
+                    return;
+                }
+
+                try {
+                    const [
+                        decimals,
+                        balanceRaw,
+                        minBalanceRaw,
+                        maxAllowedBN,
+                        ticketsBoughtBN
+                    ] = await Promise.all([
+                        safeCall(inkyContract.decimals(), 18),
+                        safeCall(inkyContract.balanceOf(account), 0),
+                        safeCall(ticketSaleRead.minBalanceToParticipate(), 0),
+                        safeCall(ticketSaleRead.getMaxTicketsAllowed(account), 0),
+                        safeCall(ticketSaleRead.ticketsBought(roundId, account), 0)
+                    ]);
+
+                    const balance = parseFloat(ethers.formatUnits(balanceRaw, decimals));
+                    const minBalance = parseFloat(ethers.formatUnits(minBalanceRaw, decimals));
+                    let maxAllowed = parseInt(maxAllowedBN?.toString() || "0");
+                    const ticketsBought = parseInt(ticketsBoughtBN?.toString() || "0");
+
+                    if (balance < minBalance) maxAllowed = 0;
+
+                    document.getElementById("inkyBalance").textContent = Math.floor(balance).toLocaleString("en-US");
+                    maxTicketsEl.textContent = maxAllowed;
+                    yourTicketsEl.textContent = ticketsBought;
+
+                    const statusEl = document.getElementById("status");
+                    if(balance >= minBalance && maxAllowed > 0) {
+                        statusEl.textContent = "✅ Eligible";
+                        statusEl.style.color = "limegreen";
+                    } else {
+                        statusEl.textContent = "❌ Not eligible";
+                        statusEl.style.color = "red";
+                    }
+
+                    updateTotalPrice();
+                } catch (err) {
+                    console.error("updateBalance failed:", err);
+                }
+            }
+
+            // ===== WALLET CONNECTION FUNCTIONS =====
+
+            /**
+             * Gets available EVM providers
+             */
+            function getEVMProviders() {
+                if (!window.ethereum) return [];
+                if (window.ethereum.providers && window.ethereum.providers.length > 0) return window.ethereum.providers;
+                return [window.ethereum];
+            }
+
+            /**
+             * Gets the wallet name from provider
+             */
+            function getWalletName(p) { 
+                if (p.isMetaMask) return "MetaMask";
+                if (p.isBraveWallet) return "Brave Wallet";
+                if (p.isCoinbaseWallet) return "Coinbase Wallet";
+                if (p.isTally) return "Tally Ho!";
+                if (p.isPhantom) return "Phantom";
+                if (p.name) return p.name;
+                return "EVM Wallet";
+            }
+
+            /**
+             * Updates the connect button based on connection status
+             */
+            async function updateButton(accounts) {
+                if (isDisconnected) accounts = [];
+                const account = accounts.length > 0 ? accounts[0] : null;
+
+                lastAccount = account;
+                if (balanceInterval) { clearInterval(balanceInterval); balanceInterval = null; }
+
+                ticketInput.value = 0;
+                updateTotalPrice();
+                
+                if (account) {
+                    button.textContent = `Connected: ${account.substring(0, 6)}...${account.slice(-4)}`;
+                    button.classList.add('connected');
+                    await updateBalance(account);
+                    balanceInterval = setInterval(() => updateBalance(account), 10000);
+                    ticketInput.oninput = () => {
+                        let maxTicketsAllowed = parseInt(maxTicketsEl.textContent.toString());
+                        let currentValue = parseInt(ticketInput.value);
+                        if (isNaN(currentValue)) currentValue = 0;
+                        if (!isNaN(maxTicketsAllowed) && currentValue > maxTicketsAllowed) ticketInput.value = maxTicketsAllowed;
+                        else if (currentValue < 0) ticketInput.value = 0;
+                        updateTotalPrice();
+                    };
+                } else {
+                    button.textContent = 'Connect your wallet';
+                    button.classList.remove('connected');
+                    await updateBalance(null);
+                    ticketInput.oninput = () => {
+                        let val = parseInt(ticketInput.value);
+                        if (isNaN(val) || val < 0) val = 0;
+                        if (val > 7) val = 7;
+                        ticketInput.value = val;
+                        updateTotalPrice();
+                    };
+                }
+            }
+
+            /**
+             * Connects to a wallet provider
+             */
+            async function connectWallet(provider) {
+                let finalError = null;
+
+                // Function to attempt connection
+                const attemptConnection = async (p) => {
+                    try {
+                        const accounts = await p.request({ method: 'eth_requestAccounts' });
+                        isDisconnected = false;
+                        localStorage.setItem("walletDisconnected", "false");
+                        await updateButton(accounts);
+                        return true; // Connection successful
+                    } catch (err) {
+                        finalError = err;
+                        return false; // Connection failed
+                    }
+                };
+
+                // 1. First attempt
+                if (await attemptConnection(provider)) {
+                    return;
+                }
+
+                // 2. If first attempt failed with instability error (-32603), retry once after a short delay
+                if (finalError && finalError.code === -32603) {
+                    console.warn("Wallet instability detected. Retrying once after 100ms...");
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                    if (await attemptConnection(provider)) {
+                        return;
+                    }
+                }
+                
+                // 3. Display final error after all attempts failed
+                if (finalError) {
+                    console.error("Wallet connection failed details:", finalError);
+                    let errorMessage = "Wallet connection failed";
+
+                    if (finalError.code === 4001) {
+                        errorMessage = "Connection rejected by user.";
+                    } else if (finalError.code === -32002) {
+                        errorMessage = "Pending request. Please check your wallet's extension/pop-up.";
+                    } else if (finalError.code === -32603) {
+                        // After retry failure
+                        errorMessage = "Wallet not ready. Please unlock your extension and try again.";
+                    } else if (finalError.message) {
+                        errorMessage = finalError.message.substring(0, 100);
+                    }
+
+                    showError(errorMessage);
+                }
+            }
+
+            /**
+             * Shows the wallet selection popup
+             */
+            function showWalletPopup() {
+                popup.innerHTML = '';
+                let providers = getEVMProviders(); 
+                
+                // If no provider is detected
+                if (providers.length === 0) { 
+                    showError("No EVM-compatible wallet detected!"); 
+                    return; 
+                }
+
+                // Display all found providers, sorting to put MetaMask first
+                providers.sort((a, b) => a.isMetaMask ? -1 : b.isMetaMask ? 1 : 0);
+                providers.forEach((p) => {
+                    const walletName = getWalletName(p);
+                    const btn = document.createElement('button');
+                    btn.textContent = walletName;
+                    // Button calls connectWallet(p)
+                    btn.addEventListener('click', async () => { hideWalletPopup(); await connectWallet(p); });
+                    popup.appendChild(btn);
+                });
+                overlay.style.display = 'block';
+                popup.style.display = 'block';
+            }
+
+            /**
+             * Hides the wallet popup
+             */
+            function hideWalletPopup() { 
+                popup.style.display = 'none'; 
+                overlay.style.display = 'none'; 
+            }
+
+            // ===== COUNTDOWN FUNCTION =====
+
+            /**
+             * Updates the countdown timer
+             */
+            async function updateCountdown() {
+                try {
+                    const now = new Date();
+                    const countdownElement = document.getElementById('countdown');
+                    const buyButton = document.getElementById('buyButton');
+                    
+                    const FIVE_MINUTES_MS = 5 * 60 * 1000; 
+                    const DEFAULT_BUTTON_TEXT = "Buy Tickets";
+
+                    const wasBlinking = countdownElement && countdownElement.classList.contains('blinking-text');
+
+                    // 1. Get draw status
+                    const drawStatusResponse = await fetch('http://localhost:3000/api/draw-status');
+                    const drawStatus = await drawStatusResponse.json();
+
+                    // STATE 1: DRAW IN PROGRESS (status === 'en_cours')
+                    if (drawStatus.status === 'en_cours') {
+                        if (countdownElement) {
+                            countdownElement.textContent = '00:00:00:00';
+                            countdownElement.classList.add('blinking-text');
+                        }
+                        if (buyButton) {
+                            buyButton.disabled = true;
+                            buyButton.textContent = "In Progress";
+                        }
+                        return;
+                    }
+
+                    // If status is no longer "en_cours" and text was blinking, refresh
+                    if (wasBlinking) {
+                        console.log('Draw finished, reloading page...');
+                        location.reload();
+                        return; 
+                    }
+
+                    // *** Removal of reactivation here to avoid blinking ***
+                    
+                    // 2. Get information to calculate next draw
+                    const drawInfoResponse = await fetch('http://localhost:3000/api/draw-info');
+                    if (!drawInfoResponse.ok) {
+                        throw new Error('Failed to fetch draw info');
+                    }
+                    const drawInfo = await drawInfoResponse.json();
+                    const DRAW_HOUR_UTC = drawInfo.scheduleHour;
+                    const DRAW_MINUTE_UTC = drawInfo.scheduleMinute;
+                    const DRAW_DAY_OF_WEEK = drawInfo.scheduleDayOfWeek;
+
+                    // 3. Calculate next draw date and time
+                    const lastDrawDate = drawStatus.lastDrawDate ? new Date(drawStatus.lastDrawDate) : new Date(0);
+                    const nextDraw = new Date(lastDrawDate);
+                    nextDraw.setUTCHours(DRAW_HOUR_UTC, DRAW_MINUTE_UTC, 0, 0);
+
+                    while (nextDraw.getUTCDay() !== DRAW_DAY_OF_WEEK || nextDraw.getTime() <= now.getTime()) {
+                        nextDraw.setUTCDate(nextDraw.getUTCDate() + 1);
+                    }
+                    
+                    if (countdownElement) {
+                        countdownElement.classList.remove('blinking-text');
+                    }
+
+                    // CALCULATE TIME REMAINING
+                    const timeRemaining = nextDraw.getTime() - now.getTime();
+                    
+                    // BUTTON STATE MANAGEMENT
+                    if (buyButton) {
+                        if (timeRemaining > 0 && timeRemaining <= FIVE_MINUTES_MS) {
+                            // STATE A: IMMINENT DRAW (less than 5 minutes)
+                            buyButton.disabled = true;
+                            buyButton.textContent = "Draw coming"; 
+                        } else {
+                            // STATE B: NORMAL (more than 5 minutes)
+                            buyButton.disabled = false;
+                            buyButton.textContent = DEFAULT_BUTTON_TEXT;
+                        }
+                    }
+                    
+                    // UPDATE COUNTDOWN
+                    const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
+                    const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
+
+                    const formattedDays = String(days).padStart(2, '0');
+                    const formattedHours = String(hours).padStart(2, '0');
+                    const formattedMinutes = String(minutes).padStart(2, '0');
+                    const formattedSeconds = String(seconds).padStart(2, '0');
+
+                    if (countdownElement) {
+                        countdownElement.textContent = `${formattedDays}:${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
+                    }
+                } catch (error) {
+                    console.error('Error fetching draw info or status:', error);
+                    const countdownElement = document.getElementById('countdown');
+                    if (countdownElement) {
+                        countdownElement.textContent = 'Server down';
+                        countdownElement.classList.remove('blinking-text');
+                    }
+                }
+            }
+
+            // ===== CHART FUNCTIONS =====
+
+            /**
+             * Sets up the evolution chart
+             */
+            async function setupEvolutionChart() {
+                const loadingMessage = document.querySelector('.chart-loading-message');
+                const chartWrapper = document.querySelector('.chart-wrapper');
+                const canvas = document.getElementById('evolutionChart');
+                const historicalBox = document.querySelector('.historical-box');
+                const participantsBox = document.querySelector('.participants-box');
+                const mainContainer = document.querySelector('main');
+                
+                try {
+                    const response = await fetch('http://localhost:3000/winners');
+                    if (!response.ok) {
+                        console.error("Failed to fetch data for the chart.");
+                        if (loadingMessage) {
+                            loadingMessage.textContent = 'Failed to load data.';
+                            loadingMessage.style.color = 'red';
+                        }
+                        return;
+                    }
+
+                    const winners = await response.json();
+                    
+                    if (winners.length === 0) {
+                        if (loadingMessage) {
+                            loadingMessage.textContent = 'No data available yet.';
+                        }
+                        if (chartWrapper) {
+                            chartWrapper.style.display = 'block';
+                        }
+                        return;
+                    }
+
+                    if (loadingMessage) {
+                        loadingMessage.style.display = 'none';
+                    }
+
+                    const sortedWinners = winners.sort((a, b) => a.roundId - b.roundId);
+                    const labels = sortedWinners.map(w => `Round ${w.roundId}`);
+                    const participantData = sortedWinners.map(w => w.numberOfParticipants);
+                    const ticketData = sortedWinners.map(w => w.totalTickets);
+
+                    const numberOfRounds = sortedWinners.length;
+                    const roundsPerView = 5;
+                    const baseWidthPerRound = 120;
+                    const effectiveWidth = Math.max(roundsPerView * baseWidthPerRound, numberOfRounds * baseWidthPerRound);
+
+                    canvas.width = effectiveWidth;
+                    canvas.height = chartWrapper.clientHeight;
+
+                    const ctx = canvas.getContext('2d');
+
+                    if (window.myEvolutionChart instanceof Chart) {
+                        window.myEvolutionChart.destroy();
+                    }
+
+                    window.myEvolutionChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Participants',
+                                data: participantData,
+                                borderColor: 'rgb(75, 192, 192)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                yAxisID: 'y-participants',
+                                tension: 0.2,
+                                fill: true
+                            }, {
+                                label: 'Tickets',
+                                data: ticketData,
+                                borderColor: 'rgb(255, 99, 132)',
+                                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                yAxisID: 'y-tickets',
+                                tension: 0.2,
+                                fill: true
+                            }]
+                        },
+                        options: {
+                            responsive: false,
+                            maintainAspectRatio: false,
+                            scales: {
+                                x: {
+                                    ticks: { color: '#E0E6ED' },
+                                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                                },
+                                'y-participants': {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'left',
+                                    title: {
+                                        display: true,
+                                        text: 'Participants',
+                                        color: 'rgb(75, 192, 192)'
+                                    },
+                                    ticks: { color: 'rgb(75, 192, 192)', precision: 0 },
+                                    grid: { color: 'rgba(75, 192, 192, 0.3)' },
+                                    beginAtZero: true
+                                },
+                                'y-tickets': {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'right',
+                                    title: {
+                                        display: true,
+                                        text: 'Tickets',
+                                        color: 'rgb(255, 99, 132)'
+                                    },
+                                    ticks: { color: 'rgb(255, 99, 132)', precision: 0 },
+                                    grid: { drawOnChartArea: false, color: 'rgba(255, 99, 132, 0.3)' },
+                                    beginAtZero: true
+                                }
+                            },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    enabled: true,
+                                    mode: 'index',
+                                    intersect: false,
+                                    backgroundColor: 'rgba(81, 100, 118, 0.9)',
+                                    callbacks: {
+                                        title: function(context) { return context[0].label; },
+                                        label: function(context) {
+                                            let label = context.dataset.label || '';
+                                            if (label) { label += ': '; }
+                                            if (context.parsed.y !== null) { label += context.parsed.y; }
+                                            return label;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    if (chartWrapper && numberOfRounds > roundsPerView) {
+                        const scrollOffset = effectiveWidth - chartWrapper.clientWidth;
+                        chartWrapper.scrollLeft = scrollOffset;
+                    }
+                    
+                    // Alignment calculation is now done without delay
+                    const chartBox = document.querySelector('.chart-box');
+                    if (!chartBox) return;
+
+                    const chartBoxBottom = chartBox.getBoundingClientRect().bottom;
+                    const mainContainerTop = mainContainer.getBoundingClientRect().top;
+                    const chartBoxBottomRelativeToMain = chartBoxBottom - mainContainerTop;
+
+                    const historicalBoxTopRelativeToMain = historicalBox.getBoundingClientRect().top - mainContainerTop;
+                    const participantsBoxTopRelativeToMain = participantsBox.getBoundingClientRect().top - mainContainerTop;
+
+                    const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
+                    const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
+
+                    historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
+                    participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
+
+                } catch (error) {
+                    console.error("Error fetching or rendering chart data:", error);
+                    if (loadingMessage) {
+                        loadingMessage.textContent = 'Failed to load data.';
+                        loadingMessage.style.color = 'red';
+                    }
+                }
+            }
+
+            // ===== CONTAINER ALIGNMENT FUNCTION =====
+
+            /**
+             * Aligns container heights for proper layout
+             */
+            function alignContainerHeights() {
+              const mainContainer = document.querySelector('main');
+              const chartBox = document.querySelector('.chart-box');
+              const historicalBox = document.querySelector('.historical-box');
+              const participantsBox = document.querySelector('.participants-box');
+              
+              // Essential check that all elements exist
+              if (!mainContainer || !chartBox || !historicalBox || !participantsBox) return;
+
+              // 1. Get reference positions
+              const mainContainerTop = mainContainer.getBoundingClientRect().top;
+
+              // 2. The bottom of the chart is our REFERENCE ALIGNMENT
+              const chartBoxBottom = chartBox.getBoundingClientRect().bottom;
+              const chartBoxBottomRelativeToMain = chartBoxBottom - mainContainerTop;
+
+              // 3. Get the TOP position of the table containers
+              const historicalBoxTopRelativeToMain = historicalBox.getBoundingClientRect().top - mainContainerTop;
+              const participantsBoxTopRelativeToMain = participantsBox.getBoundingClientRect().top - mainContainerTop;
+
+              // 4. Calculate max height: (Chart Bottom) - (Table Top) - (Grid Gap)
+              const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
+              const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
+
+              // 5. Apply calculated height
+              // This max-height activates the scrollbar (overflow-y: auto)
+              historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
+              participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
+            }
+
+            // ===== TICKET PURCHASE FUNCTION =====
+
+            /**
+             * Handles ticket purchase
+             */
+            buyButton.addEventListener('click', async () => {
+                try {
+                    const drawStatusResponse = await fetch('http://localhost:3000/api/draw-status');
+                    const drawStatus = await drawStatusResponse.json();
+                    
+                    if (drawStatus.status === 'en_cours') {
+                        showError("A draw is in progress. Ticket purchases are temporarily disabled.");
+                        return; // Exit the function immediately
+                    }
+                } catch (err) {
+                    console.error("Failed to check draw status:", err);
+                    showError("Unable to verify draw status. Please try again.");
+                    return; // Exit the function if there's an API error
+                }
+                if (!lastAccount) { showError("Connect your wallet first"); return; }
+                const amount = parseInt(ticketInput.value);
+                if(isNaN(amount) || amount <= 0) { showError("Enter a valid number of tickets"); return; }
+
+                buyButton.disabled = true;
+                try {
+                    const provider = new ethers.BrowserProvider(window.ethereum);
+                    const signer = await provider.getSigner();
+                    const ticketSaleContract = new ethers.Contract(TICKET_SALE_ADDRESS, TICKET_SALE_ABI, signer);
+                    const inkyContractWithSigner = new ethers.Contract(INKY_ADDRESS, [
+                        "function decimals() view returns (uint8)",
+                        "function allowance(address owner, address spender) view returns (uint256)",
+                        "function approve(address spender, uint256 amount) returns (bool)"
+                    ], signer);
+
+                    const decimals = await safeCall(inkyContractWithSigner.decimals(), 18);
+                    const totalCostRaw = ethers.parseUnits((ticketPrice * amount).toString(), decimals);
+
+                    const accountAddress = await safeCall(signer.getAddress(), null);
+                    if (!accountAddress) throw new Error("Cannot get wallet address");
+
+                    const allowance = await safeCall(inkyContractWithSigner.allowance(accountAddress, ticketSaleContract.target), 0);
+                    if (allowance < totalCostRaw) {
+                        showLoading("⏳ Waiting for approval...");
+                        const approveTx = await safeCall(inkyContractWithSigner.approve(ticketSaleContract.target, totalCostRaw));
+                        if(!approveTx) throw new Error("Approval failed or rejected");
+                        await safeCall(approveTx.wait());
+                        hideLoading();
+                    }
+
+                    showLoading("⏳ Waiting for ticket purchase...");
+                    const tx = await safeCall(ticketSaleContract.buyTickets(amount));
+                    if(!tx) throw new Error("Purchase failed or rejected");
+                    await safeCall(tx.wait());
+                    showLoading('✅ Purchase successful! <img src="inky-logo.png" style="width:74px; vertical-align:middle; margin-left:6px;">');
+                    setTimeout(() => { hideLoading(); }, 3000);
+
+                    const roundId = await safeCall(ticketSaleRead.currentRoundId(), 1);
+                    await Promise.all([
+                        updateBalance(accountAddress),
+                        updateStats(roundId),
+                        updateParticipantsTable(roundId)
+                    ]);
+
+                } catch(err) {
+                    hideLoading();
+                    console.error("Transaction error:", err);
+                    showError("Transaction failed: " + (err?.message || err));
+                } finally {
+                    buyButton.disabled = false;
+                }
+            });
+
+            // ===== INITIALIZATION FUNCTIONS =====
+
+            /**
+             * Initializes all data
+             */
+            async function initializeData() {
+                const [
+                    fetchedRoundId,
+                    fetchedTicketPrice,
+                    fetchedWinnerData
+                ] = await Promise.all([
+                    safeCall(ticketSaleRead.currentRoundId(), 1),
+                    safeCall(ticketSaleRead.ticketPrice(), 500),
+                    fetchWinner()
+                ]);
+
+                roundId = fetchedRoundId;
+                ticketPrice = parseInt(fetchedTicketPrice?.toString() || "500");
+                
+                await Promise.all([
+                    updateStats(roundId),
+                    updateParticipantsTable(roundId),
+                    updateWinnersTable(),
+                    setupEvolutionChart() 
+                ]);
+                
+                const providers = getEVMProviders();
+                providers.forEach(p => { if (p && p.on) p.on('accountsChanged', updateButton); });
+
+                if (!isDisconnected) {
+                    for (const p of providers) {
+                        if (p) {
+                            const accounts = await safeCall(p.request({ method: 'eth_accounts' }), []);
+                            if (accounts.length > 0) {
+                                await updateButton(accounts);
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                        await updateButton([]);
+                }
+            }
+
+            /**
+             * Starts update intervals for dynamic data
+             */
+            function startUpdateIntervals() {
+                setInterval(async () => {
+                    const currentRound = await safeCall(ticketSaleRead.currentRoundId(), roundId);
+                    if (currentRound !== roundId) {
+                        roundId = currentRound;
+                        await Promise.all([
+                            updateStats(roundId),
+                            updateParticipantsTable(roundId),
+                            fetchWinner(), // Added here to update last winner if a new round starts
+                            updateWinnersTable(), // Added here to update winners history
+                            setupEvolutionChart() 
+                        ]);
+                    } else {
+                        await Promise.all([
+                            updateStats(roundId),
+                            updateParticipantsTable(roundId)
+                        ]);
+                    }
+                }, 10000);
+                
+                // Interval for countdown, more frequent
+                setInterval(updateCountdown, 1000); 
+            }
+
+            // ===== EVENT LISTENERS =====
+            overlay.addEventListener('click', hideWalletPopup);
+
+            button.addEventListener('click', () => {
+                if (lastAccount) {
+                    lastAccount = null;
+                    isDisconnected = true;
+                    localStorage.setItem("walletDisconnected", "true");
+                    updateButton([]);
+                    return;
+                }
+                showWalletPopup();
+            });
+
+            // Ensure the function is called AFTER everything is rendered
+            window.addEventListener('load', () => {
+                // A slight delay is often needed after 'load' for complex elements (like Chart.js)
+                setTimeout(alignContainerHeights, 100); 
+            });
+
+            // Important: recall the function on resize
+            window.onresize = alignContainerHeights;
+
+            // ===== START APPLICATION =====
+            initializeData();
+            startUpdateIntervals();
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</body>
+</html>

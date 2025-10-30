@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INKY Toolbox - Governance & Rewards</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* ===== BASE STYLES & ANIMATIONS ===== */
+        :root {
+            --primary-gold: #E5C07B;
+            --dark-bg: #2E3A46;
+            --medium-bg: #3C4F65;
+            --light-bg: #4A5A6A;
+            --text-light: #F0F0F0;
+            --text-muted: #E0E6ED;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            color: #fff;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+            background: linear-gradient(270deg, #3C4F65, #2E3A46, #4A5A6A, #6C7A89);
+            background-size: 800% 800%;
+            animation: gradientBG 20s ease infinite;
+            min-height: 100vh;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* ===== SECTION STYLES ===== */
+        section {
+            padding: 80px 20px 100px 20px;
+            text-align: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            transition: all 1s ease;
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        section.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        section h2 {
+            font-size: 46px;
+            margin: 0 0 20px 0;
+            font-weight: 700;
+            color: #fff;
+            text-shadow: 1px 1px 5px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        section h2 img {
+            height: 90px;
+            width: auto;
+        }
+
+        section p {
+            font-size: 18px;
+            max-width: 800px;
+            margin: 0 auto 30px auto;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        /* Section containers with unified styling */
+        #about, #tokenomics, #governance, #toolbox, #tombola, #disclaimer {
+            background: rgba(0,0,0,0.15);
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            margin-top: 50px;
+            margin-bottom: 50px;
+        }
+
+        #toolbox {
+            border-top: none;
+            padding: 80px 20px 100px 20px;
+        }
+
+        /* ===== NAVIGATION ===== */
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.35);
+            padding: 10px 50px;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 100;
+            height: 80px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+        }
+
+        nav .logo {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            transition: transform 0.3s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        nav .logo:hover {
+            transform: scale(1.07);
+        }
+
+        nav .logo img {
+            height: 85px;
+            width: auto;
+            transition: transform 0.3s;
+        }
+
+        nav .logo span {
+            font-size: 20px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: 1px;
+            -webkit-tap-highlight-color: transparent; 
+            user-select: none; 
+        }
+
+        nav .nav-links {
+            display: flex;
+            align-items: center;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin-left: 30px;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            position: relative;
+            transition: color 0.3s, transform 0.3s;
+        }
+
+        nav a::after {
+            content: '';
+            display: block;
+            width: 0;
+            height: 3px;
+            background: var(--primary-gold);
+            transition: width 0.3s;
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+        }
+
+        nav a:hover {
+            color: var(--primary-gold);
+            transform: scale(1.05);
+        }
+
+        nav a:hover::after {
+            width: 100%;
+        }
+
+        /* ===== HAMBURGER MENU ===== */
+        .hamburger {
+            display: none;
+            flex-direction: column;
+            cursor: pointer;
+            padding: 8px;
+            z-index: 101;
+            background: rgba(229, 192, 123, 0.1);
+            border-radius: 5px;
+            border: 1px solid rgba(229, 192, 123, 0.3);
+        }
+
+        .hamburger span {
+            width: 25px;
+            height: 3px;
+            background: var(--primary-gold);
+            margin: 3px 0;
+            transition: 0.3s;
+            border-radius: 2px;
+        }
+
+        /* Hamburger animation when active */
+        .hamburger.active span:nth-child(1) {
+            transform: rotate(-45deg) translate(-5px, 6px);
+        }
+
+        .hamburger.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .hamburger.active span:nth-child(3) {
+            transform: rotate(45deg) translate(-5px, -6px);
+        }
+
+        /* ===== HEADER SECTION ===== */
+        header {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 80px;
+            padding: 150px 20px 80px 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            flex-wrap: wrap;
+        }
+
+        .header-left {
+            flex: 1;
+            min-width: 300px;
+            text-align: left;
+        }
+
+        header h1 {
+            font-size: 42px;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+            white-space: nowrap;
+        }
+
+        .header-left p {
+            font-size: 22px;
+            margin-bottom: 30px;
+            line-height: 1.6;
+            color: var(--text-muted);
+            text-shadow: 1px 1px 4px rgba(0,0,0,0.3);
+            max-width: 600px;
+        }
+
+        .header-right {
+            flex: 1;
+            min-width: 300px;
+            text-align: right;
+            margin-left: 60px;
+            perspective: 1000px;
+        }
+
+        .header-right img {
+            width: 480px;
+            max-width: 100%;
+            height: auto;
+            transition: transform 0.5s;
+            animation: float 4s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+
+        /* ===== BUTTON STYLES ===== */
+        .button {
+            display: inline-block;
+            padding: 15px 40px;
+            margin: 10px 10px 0 0;
+            font-size: 20px;
+            font-weight: bold;
+            color: #fff;
+            background: linear-gradient(270deg, #4A5A6A, #2E3A46, #6C7A89, #4A5A6A);
+            background-size: 600% 600%;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s, color 0.3s;
+            text-decoration: none;
+        }
+
+        .button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px 3px #6C7A89;
+            animation: gradientAnimation 3s ease infinite;
+            color: var(--primary-gold);
+        }
+
+        @keyframes gradientAnimation {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Special tombola button styling */
+        .tombola-button {
+            font-size: 18px !important;
+            padding: 15px 30px !important;
+            border-radius: 10px !important;
+            text-align: center;
+            min-width: 200px;
+            width: auto !important;
+            display: inline-block !important;
+            margin: 0 auto !important;
+        }
+
+        /* ===== TOKENOMICS SECTION ===== */
+        .tokenomics-content {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 50px;
+            margin-top: 40px;
+            flex-wrap: wrap;
+            position: relative;
+            z-index: 10;
+        }
+
+        .tokenomics-box {
+            flex: 1;
+            min-width: 300px;
+            max-width: 500px;
+            background: rgba(255,255,255,0.08);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: left;
+            line-height: 1.8;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            border: 1px solid rgba(229, 192, 123, 0.2);
+        }
+
+        .tokenomics-box strong {
+            color: var(--primary-gold);
+            font-weight: 700;
+        }
+
+        .tokenomics-box p {
+            margin: 5px 0;
+            font-size: 16px;
+            max-width: 100%;
+        }
+
+        .chart-container {
+            flex-basis: 350px;
+            height: 350px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            border: 1px solid rgba(229, 192, 123, 0.2);
+            position: relative;
+            z-index: 15;
+        }
+
+        /* ===== FEATURE CARDS (INKY Council) ===== */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+            text-align: left;
+        }
+
+        .feature-card {
+            background: rgba(255,255,255,0.05);
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+            border-top: 3px solid var(--primary-gold);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
+
+        .feature-card i {
+            font-size: 32px;
+            color: var(--primary-gold);
+            margin-bottom: 10px;
+        }
+
+        .feature-card h3 {
+            font-size: 20px;
+            margin-top: 0;
+            color: #fff;
+        }
+
+        .feature-card p {
+            font-size: 15px;
+            margin: 0;
+            color: var(--text-muted);
+            max-width: 100%;
+        }
+
+        /* ===== CTA LINK STYLES ===== */
+        .council-cta-link {
+            display: inline-block;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary-gold);
+            text-decoration: none;
+            margin-top: 30px;
+            border-bottom: 3px solid rgba(229, 192, 123, 0.4);
+            padding-bottom: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .council-cta-link i {
+            margin-left: 10px;
+            transition: transform 0.3s;
+        }
+
+        .council-cta-link:hover {
+            color: #fff;
+            border-bottom: 3px solid var(--primary-gold);
+        }
+
+        .council-cta-link:hover i {
+            transform: translateX(5px);
+        }
+
+        /* ===== INKY TOOLBOX SPECIFIC STYLES ===== */
+        #toolbox .toolbox-icon {
+            font-size: 50px;
+            color: #61AFEF;
+            margin-bottom: 20px;
+            display: none;
+            animation: fadePulse 3s infinite;
+        }
+
+        @keyframes fadePulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+
+        #toolbox p {
+            max-width: 900px;
+            margin: 0 auto 15px auto;
+            line-height: 1.6;
+            font-size: 18px;
+            text-align: center;
+            color: var(--text-light);
+        }
+
+        #toolbox p:last-of-type {
+            margin-bottom: 30px;
+        }
+
+        /* ===== TOMBOLA SECTION ===== */
+        .tombola-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-top: 40px;
+            text-align: left;
+            align-items: center;
+        }
+
+        .tombola-info-box {
+            background: rgba(255,255,255,0.08);
+            padding: 30px;
+            border-radius: 10px;
+            border: 1px solid #4A5A6A;
+        }
+
+        .tombola-info-box p {
+            font-size: 16px;
+            margin: 10px 0;
+            color: var(--text-muted);
+            max-width: 100%;
+        }
+
+        .tombola-info-box strong {
+            color: var(--primary-gold);
+            font-weight: 700;
+        }
+
+        .tombola-visual {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(229, 192, 123, 0.5);
+        }
+
+        .tombola-visual i {
+            font-size: 80px;
+            color: var(--primary-gold);
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 0.8; }
+        }
+
+        /* ===== DISCLAIMER SECTION ===== */
+        #disclaimer {
+            border: none;
+            padding: 40px 20px;
+        }
+
+        #disclaimer p {
+            max-width: 900px;
+            margin: 20px auto;
+            text-align: left;
+            line-height: 1.6;
+            padding: 0 15px;
+            border-left: 5px solid rgba(229, 192, 123, 0.5);
+        }
+
+        #disclaimer p strong {
+            color: var(--primary-gold);
+        }
+
+        /* ===== FOOTER ===== */
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            background: rgba(0,0,0,0.2);
+            border-top: 1px solid #4A5A6A;
+        }
+
+        footer h3 {
+            margin-top: 0;
+            font-size: 20px;
+            color: var(--text-muted);
+        }
+
+        .social-icons a {
+            color: #fff;
+            font-size: 24px;
+            margin: 0 15px;
+            transition: color 0.3s;
+        }
+
+        .social-icons a:hover {
+            color: var(--primary-gold);
+        }
+
+        /* ===== RESPONSIVE DESIGN ===== */
+        /* Tablet devices (801px to 1000px) */
+        @media (max-width: 1000px) {
+            header {
+                flex-direction: column;
+                gap: 40px;
+                text-align: center;
+            }
+            
+            .header-left {
+                min-width: 100%;
+                text-align: center;
+            }
+            
+            .header-left p {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            
+            .header-right {
+                min-width: 100%;
+                text-align: center;
+                margin-left: 0;
+            }
+            
+            .header-right img {
+                width: 60%;
+                margin: 20px auto 0 auto;
+            }
+        }
+
+        /* Mobile devices (601px to 800px) */
+        @media (max-width: 800px) {
+            nav {
+                padding: 10px 20px;
+            }
+            
+            /* Show hamburger and hide default links */
+            .hamburger {
+                display: flex !important;
+            }
+            
+            .nav-links {
+                display: none !important;
+                position: fixed;
+                top: 80px;
+                left: 0;
+                width: 100%;
+                height: 100vh;
+                background: rgba(44, 58, 71, 0.98);
+                flex-direction: column;
+                padding: 30px 25px;
+                z-index: 999;
+                backdrop-filter: blur(10px);
+                overflow-y: auto;
+            }
+            
+            .nav-links.active {
+                display: flex !important;
+            }
+            
+            nav a {
+                margin: 0 0 10px 0;
+                padding: 18px 25px 18px 30px;
+                border-bottom: 1px solid rgba(229, 192, 123, 0.2);
+                font-size: 18px;
+                width: 100%;
+                background: transparent;
+                transition: background 0.3s;
+                border-radius: 8px;
+            }
+            
+            nav a:hover {
+                background: rgba(229, 192, 123, 0.15);
+            }
+            
+            nav a::after {
+                display: none;
+            }
+            
+            nav .logo img {
+                height: 70px;
+            }
+            
+            /* CORRECTION PADDING SECTIONS TABLETTE */
+            section {
+                padding: 80px 20px 60px 20px !important;
+            }
+            
+            #about, #tokenomics, #governance, #toolbox, #tombola, #disclaimer {
+                margin: 40px 20px !important;
+                width: calc(100% - 40px) !important;
+            }
+            
+            header {
+                padding: 120px 20px 60px 20px !important;
+                width: calc(100% - 40px) !important;
+                margin: 0 20px !important;
+            }
+            
+            /* TITRES POUR TABLETTE */
+            section h2 {
+                font-size: 36px;
+                gap: 15px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            section h2 img {
+                height: 70px;
+            }
+            
+            /* Titre Tombola spécifique pour tablette */
+            .tombola-title {
+                font-size: 36px !important;
+                flex-direction: row !important;
+                gap: 15px !important;
+                flex-wrap: wrap;
+            }
+            
+            .tombola-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .tombola-visual {
+                order: -1;
+            }
+            
+            /* Liens CTA pour tablette */
+            .council-cta-link {
+                font-size: 18px;
+                padding: 0 20px;
+                text-align: center;
+                display: inline-block;
+                margin: 25px auto 0 auto;
+                max-width: 100%;
+                word-break: break-word;
+            }
+            
+            .council-cta-link i {
+                margin-left: 8px;
+                font-size: 16px;
+            }
+        }
+
+        /* Small mobile devices (up to 600px) */
+        @media (max-width: 600px) {
+            .tokenomics-content {
+                gap: 20px;
+                flex-direction: column;
+            }
+            
+            .tokenomics-box, .chart-container {
+                max-width: 100%;
+            }
+            
+            /* Contract address mobile optimization */
+            #tokenomics p:last-of-type {
+                word-break: break-all;
+                font-size: 14px;
+                padding: 0 10px;
+            }
+            
+            #tokenomics a {
+                display: inline-block;
+                max-width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            
+            header h1 {
+                font-size: 32px;
+                white-space: normal;
+                line-height: 1.3;
+            }
+            
+            #disclaimer p {
+                border-left: none;
+            }
+            
+            /* CORRECTION PADDING SECTIONS MOBILE */
+            section {
+                padding: 80px 15px 60px 15px !important;
+            }
+            
+            #about, #tokenomics, #governance, #toolbox, #tombola, #disclaimer {
+                margin: 30px 15px !important;
+                width: calc(100% - 30px) !important;
+            }
+            
+            header {
+                padding: 120px 15px 40px 15px !important;
+                width: calc(100% - 30px) !important;
+                margin: 0 15px !important;
+            }
+            
+            .header-left p {
+                font-size: 18px;
+            }
+            
+            .header-buttons {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+            
+            .button {
+                width: 100%;
+                margin: 0;
+                font-size: 18px;
+                padding: 14px 20px;
+            }
+            
+            .tombola-button {
+                min-width: 180px;
+                padding: 12px 25px !important;
+                font-size: 16px !important;
+            }
+            
+            /* CORRECTION DES TITRES POUR MOBILE */
+            section h2 {
+                font-size: 28px;
+                flex-direction: row;
+                gap: 15px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            section h2 img {
+                height: 50px;
+            }
+            
+            /* Titre Tombola spécifique pour mobile */
+            .tombola-title {
+                font-size: 28px !important;
+                flex-direction: row !important;
+                gap: 15px !important;
+                flex-wrap: wrap;
+            }
+            
+            /* Correction pour les liens CTA sur mobile */
+            .council-cta-link {
+                font-size: 16px;
+                padding: 0 15px;
+                text-align: center;
+                display: inline-block;
+                margin: 20px auto 0 auto;
+                max-width: 100%;
+                word-break: break-word;
+                line-height: 1.4;
+                border-bottom: 2px solid rgba(229, 192, 123, 0.4);
+            }
+            
+            .council-cta-link i {
+                margin-left: 5px;
+                font-size: 14px;
+            }
+            
+            /* Ajustement spécifique pour le conteneur des liens */
+            #governance > div:last-child,
+            #toolbox > div:last-child {
+                padding: 0 10px;
+            }
+            
+            /* Feature cards adjustment for mobile */
+            .feature-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+                padding: 0 10px;
+            }
+            
+            .feature-card {
+                padding: 20px 15px;
+            }
+            
+            /* Tombola section mobile adjustments */
+            .tombola-info-box {
+                padding: 20px 15px;
+            }
+            
+            .tombola-visual {
+                padding: 30px 20px;
+            }
+            
+            .tombola-visual i {
+                font-size: 60px;
+            }
+            
+            /* Footer adjustments */
+            footer {
+                padding: 20px 15px;
+            }
+            
+            .social-icons a {
+                margin: 0 10px;
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ===== NAVIGATION ===== -->
+    <nav>
+        <div class="logo" id="home-logo">
+            <img src="inky-logo.png" alt="INKY Logo">
+            <span>INKY</span>
+        </div>
+        
+        <div class="nav-links">
+            <a data-target="home">Home</a>
+            <a data-target="about">About</a>
+            <a data-target="tokenomics">Tokenomics</a>
+            <a data-target="governance">INKY Council</a>
+            <a data-target="toolbox">INKY Toolbox</a>
+            <a data-target="tombola">Tombola</a>
+            <a data-target="disclaimer">Disclaimer</a>
+        </div>
+        
+        <div class="hamburger" id="hamburger">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </nav>
+
+    <!-- ===== HEADER / HERO SECTION ===== -->
+    <header id="home">
+        <div class="header-left">
+            <h1>WELCOME TO INKY WORLD</h1>
+            <p>A next-gen meme coin redefining <strong>Nexera Chain</strong>. 
+                <br>
+                <strong>INKY</strong> unites utility, gaming, and governance — giving users real tools, real fun, and real impact on the ecosystem.</p>
+            <div class="header-buttons">
+                <button class="button buy-button">Buy $INKY</button>
+                <button class="button">Join the Community</button>
+            </div>
+        </div>
+        <div class="header-right">
+            <img src="inky.png" alt="INKY Coin" id="inky-img" loading="lazy">
+        </div>
+    </header>
+
+    <!-- ===== ABOUT SECTION ===== -->
+    <section id="about">
+        <h2>About INKY <img src="inky-logo.png" alt="INKY Logo"></h2>
+        <p>
+            <strong>$INKY</strong> is not just another token, it's the <strong>first meme coin built on the cutting-edge NXRA Chain</strong>, marrying high-level enterprise technology with pure fun.
+        </p>
+        <p>
+            We invite you to join the <strong>Tokenization King's Journey</strong>-a movement that fully embraces the powerful infrastructure of NXRA while fostering a community that is genuinely engaging and doesn't take itself too seriously. Ride the wave of institutional-grade blockchain tech and prove that innovation and viral spirit can go hand in hand. <strong>$INKY</strong> shows the crypto world that you can build serious infrastructure <em>and</em> still have a great time!
+        </p>
+    </section>
+
+    <!-- ===== TOKENOMICS SECTION ===== -->
+    <section id="tokenomics">
+        <h2>Tokenomics 💰</h2>
+        <p>
+            The <strong>$INKY</strong> tokenomics are designed to be entirely community-focused, utilizing a minimal transaction fee to continuously finance the <strong>Community Prize Pool</strong>, with all decisions regarding those funds resting with the decentralized <strong>INKY Council</strong>.
+        </p>
+        <p>
+            <strong>$INKY</strong> Contract Address: 
+            <a href="https://explorer.testnet.nexera.network/token/0x6EB2C1fE4e3B48af4905A0209658810B61343438" target="_blank" style="color:#E5C07B; text-decoration:underline;">
+                0x6EB2C1fE4e3B48af4905A0209658810B61343438
+            </a>
+        </p>
+        <div class="tokenomics-content">
+            <div class="tokenomics-box">
+                <p><strong>Total Supply:</strong> 500M $INKY</p>
+                <p><strong>Blockchain Platform:</strong> Nexera Chain</p>
+                <p style="margin-top:20px;"><strong>Distribution:</strong></p>
+                <p>• Team: 25% (5% immediate, 20% vested over 2 years)</p>
+                <p>• Liquidity: 30%</p>
+                <p>• Treasury: 35%</p>
+                <p>• Airdrop: 10%</p>
+                <p style="margin-top:20px;"><strong>Transaction Tax:</strong></p>
+                <p>• 1% → Community Prize Pool (adjustable by INKY Council)</p>
+            </div>
+            <div class="chart-container">
+                <canvas id="tokenomicsChart"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== GOVERNANCE SECTION ===== -->
+    <section id="governance">
+        <h2>INKY Council 🗳️</h2>
+        <p>
+            <strong>$INKY</strong> is your gateway to collective power. Through the <strong>INKY Council</strong>, holders shape every aspect of the project — from feature evolution and new integrations to tombola parameters and treasury decisions.
+        </p>
+        
+        <div class="feature-grid">
+            <div class="feature-card">
+                <i class="fas fa-gavel"></i>
+                <h3>True Governance</h3>
+                <p>Use your <strong>$INKY</strong> to vote on official proposals and direct the project's evolution, ensuring the team remains accountable to the community.</p>
+            </div>
+            <div class="feature-card">
+                <i class="fas fa-piggy-bank"></i>
+                <h3>Treasury Control</h3>
+                <p>Decide how the community treasury funds are utilized—be it for marketing campaigns, charitable donations, or new feature development.</p>
+            </div>
+            <div class="feature-card">
+                <i class="fas fa-cogs"></i>
+                <h3>Feature Parameter Voting</h3>
+                <p>Vote on the core mechanics of ecosystem features, including Tombola rules, prize percentages, and burn mechanisms.</p>
+            </div>
+        </div>
+        
+        <div style="margin-top: 50px;">
+            <a href="https://snapshot.org/#/inky-council.eth" target="_blank" class="council-cta-link">
+                Access the Voting Space (Snapshot) <i class="fas fa-arrow-right"></i>
+            </a>
+        </div>
+    </section>
+
+    <!-- ===== TOOLBOX SECTION ===== -->
+    <section id="toolbox">
+        <h2 class="toolbox-title">INKY Toolbox 🛠️</h2>
+        <p>
+            The <strong>INKY Toolbox</strong> is a suite of practical, community-requested utility tools for the <strong>NXRA Chain</strong>. We're building essential features often overlooked by other chains, such as advanced wallet screeners, token approval checkers, vesting trackers, and more.
+        </p>
+        
+        <p>
+            This Toolbox will evolve <strong>incrementally</strong>. The core principle is full decentralization: the <strong>INKY Council</strong> will utilize the governance system to <strong>vote and decide</strong> which new functionalities are integrated into the Toolbox over time, ensuring the development roadmap directly reflects the community's needs and security priorities.
+        </p>
+
+        <div style="margin-top: 50px;">
+            <a href="toolbox.html" target="_blank" class="council-cta-link">
+                Access the INKY Toolbox <i class="fas fa-arrow-right"></i>
+            </a>
+        </div>
+    </section>
+
+    <!-- ===== TOMBOLA SECTION ===== -->
+    <section id="tombola">
+        <h2 class="tombola-title" style="font-size:48px;">
+            INKY Tombola <i class="fas fa-dice-three" style="color:#E5C07B;"></i>
+        </h2>
+        <p style="font-size:20px; max-width:750px; margin: 0 auto 40px auto; line-height:1.6; color:#F0F0F0;">
+            This feature is a <strong>community rewards system</strong> funded by transaction taxes. Its rules are entirely governed by the <strong>INKY Council</strong> to ensure fairness and transparency.
+        </p>
+
+        <div class="tombola-grid">
+            <div class="tombola-info-box">
+                <p><strong>Rules:</strong> Determined by the <strong>INKY Council</strong> vote for fairness.</p>
+                <p><strong>Funding:</strong> Powered by a small tax on every <strong>$INKY</strong> transaction.</p>
+                <p><strong>Prize:</strong> The winner receives the <strong>capped</strong> Prize Pool amount, and the <strong>surplus</strong> is sent to burn. </p>
+                <p><strong>Frequency:</strong> Automatic draws on the <strong>NXRA</strong> chain.</p>
+            </div>
+            <div class="tombola-visual">
+                <i class="fas fa-gift"></i>
+                <a href="tombola.html" class="button tombola-button" target="_blank">
+                    Try Your Luck!
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== DISCLAIMER SECTION ===== -->
+    <section id="disclaimer">
+        <h2>Disclaimer <i class="fas fa-exclamation-triangle" style="color:#FF4D4D;"></i></h2>
+        <p style="font-weight: bold; color: #E5C07B;">RISK WARNING & UTILITY DISCLOSURE</p>
+        <p>The <strong>$INKY token</strong> is primarily a <strong>Governance Asset</strong>, granting voting rights within the <strong>INKY Council</strong>. It has no intrinsic value and carries no expectation of financial return.</p>
+        <p>The <strong>Tombola</strong> feature is an <strong>experimental community rewards mechanism</strong> whose rules are set by the <strong>INKY Council</strong>. Its operation may be illegal in certain jurisdictions and participation is entirely at your own risk. You could lose your entire <strong>$INKY</strong> stake.</p>
+        <p style="text-align: center; margin-top: 20px;">
+            <strong>$INKY</strong> is for fun, entertainment, and governance purposes only.
+        </p>
+    </section>
+
+    <!-- ===== FOOTER ===== -->
+    <footer>
+        <h3>Follow us on</h3>
+        <div class="social-icons">
+            <a href="#" target="_blank"><i class="fab fa-twitter"></i></a>
+            <a href="#" target="_blank"><i class="fab fa-discord"></i></a>
+            <a href="#" target="_blank"><i class="fab fa-telegram"></i></a>
+        </div>
+    </footer>
+
+    <script>
+        // ===== HAMBURGER MENU FUNCTIONALITY =====
+        const hamburger = document.getElementById('hamburger');
+        const navLinks = document.querySelector('.nav-links');
+
+        if (hamburger) {
+            hamburger.addEventListener('click', function(e) {
+                e.stopPropagation();
+                navLinks.classList.toggle('active');
+                this.classList.toggle('active');
+                
+                if (navLinks.classList.contains('active')) {
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    document.body.style.overflow = '';
+                }
+            });
+        }
+
+        // Close menu when clicking outside
+        document.addEventListener('click', function(event) {
+            if (hamburger && !event.target.closest('nav') && navLinks.classList.contains('active')) {
+                navLinks.classList.remove('active');
+                hamburger.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        });
+
+        // ===== SMOOTH SCROLL NAVIGATION =====
+        document.querySelectorAll('nav a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('data-target');
+                const targetElement = document.getElementById(targetId);
+                
+                // Close mobile menu if open
+                if (hamburger && navLinks.classList.contains('active')) {
+                    navLinks.classList.remove('active');
+                    hamburger.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+                
+                // Handle toolbox redirection
+                if (targetId === 'toolbox' && !targetElement) {
+                    window.open('toolbox.html', '_blank');
+                    return;
+                }
+
+                if (!targetElement) return;
+                
+                const navbarHeight = document.querySelector('nav').offsetHeight;
+                const elementPosition = targetElement.getBoundingClientRect().top + window.pageYOffset;
+                const offsetPosition = elementPosition - navbarHeight;
+
+                window.scrollTo({ top: offsetPosition, behavior: "smooth" });
+            });
+        });
+
+        // Scroll to top on logo click
+        document.getElementById('home-logo').addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+
+        // ===== FADE-IN SECTIONS ON SCROLL =====
+        const sections = document.querySelectorAll('section');
+        const checkVisibility = () => {
+            const triggerPoint = window.innerHeight / 1.3;
+            sections.forEach(section => {
+                const sectionTop = section.getBoundingClientRect().top;
+                if(sectionTop < triggerPoint) section.classList.add('visible');
+            });
+        };
+        window.addEventListener('scroll', checkVisibility);
+        window.addEventListener('load', checkVisibility);
+
+        // Close menu on window resize (if switching to desktop)
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 800 && navLinks.classList.contains('active')) {
+                navLinks.classList.remove('active');
+                hamburger.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        });
+
+        // ===== TOKENOMICS CHART =====
+        const data = {
+            labels: ['Team','Liquidity','Treasury','Airdrop'],
+            datasets: [{ 
+                data: [25,30,35,10], 
+                backgroundColor: ['#E5C07B','#61AFEF','#98C379','#C678DD'], 
+                borderColor: '#2E3A46', 
+                borderWidth: 4, 
+                hoverOffset: 30 
+            }]
+        };
+        
+        new Chart(document.getElementById('tokenomicsChart'), { 
+            type: 'doughnut', 
+            data: data, 
+            options: {
+                responsive: true, 
+                maintainAspectRatio: false,
+                cutout: '60%', 
+                plugins: {
+                    legend: {
+                        position: 'bottom', 
+                        labels: {
+                            color: '#E0E6ED', 
+                            font: {
+                                size: 16, 
+                                weight: '600'
+                            }
+                        }
+                    }, 
+                    tooltip: {
+                        bodyColor: '#fff', 
+                        backgroundColor: 'rgba(60, 79, 101, 0.9)', 
+                        borderColor: '#E5C07B', 
+                        borderWidth: 1,
+                        padding: 12
+                    }
+                } 
+            }
+        });
+    </script>
+</body>
+</html>

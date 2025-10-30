@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INKY Tombola - How it works?</title>
+    <style>
+        :root {
+            /* Couleurs modernes et douces */
+            --color-bg-light: #f4f6f7;
+            --color-primary: #5d4037; /* Dark Brown */
+            --color-accent: #8d6e63; /* Medium Brown for highlights */
+            --color-warning-bg: #ffe0b2; /* Light Orange/Peach for warning */
+            --color-warning-border: #ef6c00; /* Darker Orange */
+            --color-text: #333333;
+            --color-code-bg: #eeeeee;
+            --primary-gold: #E5C07B;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(270deg, #3C4F65, #2E3A46, #4A5A6A, #6C7A89);
+            background-size: 800% 800%;
+            animation: gradientBG 20s ease infinite;
+            margin: 0;
+            padding: 20px;
+            color: var(--color-text);
+            min-height: 100vh;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .container {
+            max-width: 900px;
+            width: 95%;
+            margin: auto;
+            background-color: var(--color-bg-light);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            color: var(--color-primary);
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 0.5em;
+        }
+
+        h2 {
+            color: var(--color-primary);
+            margin-top: 30px;
+            padding-bottom: 5px;
+            border-bottom: 3px solid var(--color-accent);
+            font-size: 1.8em;
+            text-align: left;
+        }
+
+        p, li {
+            line-height: 1.8;
+            font-size: 1.05em;
+        }
+
+        code {
+            background-color: var(--color-code-bg);
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.95em;
+            color: var(--color-primary);
+            word-break: break-word;
+        }
+
+        ul, ol {
+            padding-left: 25px;
+        }
+        
+        li {
+            margin-bottom: 8px;
+        }
+
+        .highlight {
+            font-weight: bold;
+            color: var(--color-accent);
+        }
+
+        /* Responsive Disclaimer Box */
+        .disclaimer-box {
+            background-color: var(--color-warning-bg);
+            border: 3px solid var(--color-warning-border);
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 30px;
+            text-align: left;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .disclaimer-box h3 {
+            color: var(--color-warning-border);
+            margin-top: 0;
+            font-size: 1.4em;
+            text-align: center;
+            text-transform: uppercase;
+        }
+        
+        .disclaimer-box p {
+            margin: 15px 0;
+            font-size: 1em;
+            line-height: 1.6;
+        }
+        
+        .disclaimer-box strong {
+            color: #c62828;
+            font-weight: 700;
+        }
+
+        /* Ligne de séparation */
+        hr {
+            border: 0;
+            height: 1px;
+            background-color: #d3d3d3;
+            margin: 30px 0;
+        }
+
+        /* ===== RESPONSIVE DESIGN ===== */
+        /* Tablette (768px - 1024px) */
+        @media (max-width: 1024px) {
+            .container {
+                padding: 25px;
+                width: 95%;
+            }
+            
+            h1 {
+                font-size: 2.2em;
+            }
+            
+            h2 {
+                font-size: 1.6em;
+            }
+            
+            .disclaimer-box {
+                padding: 20px;
+            }
+            
+            .disclaimer-box h3 {
+                font-size: 1.3em;
+            }
+        }
+
+        /* Tablette petite (601px - 768px) */
+        @media (max-width: 768px) {
+            body {
+                padding: 15px;
+            }
+            
+            .container {
+                padding: 20px;
+                width: 100%;
+                border-radius: 8px;
+            }
+            
+            h1 {
+                font-size: 1.8em;
+            }
+            
+            h2 {
+                font-size: 1.4em;
+                margin-top: 25px;
+                text-align: left;
+            }
+            
+            p, li {
+                font-size: 1em;
+                line-height: 1.6;
+            }
+            
+            .disclaimer-box {
+                padding: 18px;
+                margin-bottom: 25px;
+            }
+            
+            .disclaimer-box h3 {
+                font-size: 1.2em;
+            }
+            
+            .disclaimer-box p {
+                font-size: 0.95em;
+            }
+            
+            ul, ol {
+                padding-left: 20px;
+            }
+        }
+
+        /* Mobile (up to 600px) */
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 15px;
+                width: 100%;
+                border-radius: 6px;
+                margin: 10px auto;
+            }
+            
+            h1 {
+                font-size: 1.6em;
+                margin-bottom: 0.3em;
+            }
+            
+            h2 {
+                font-size: 1.3em;
+                margin-top: 20px;
+                text-align: left;
+                border-bottom-width: 2px;
+            }
+            
+            p, li {
+                font-size: 0.95em;
+                line-height: 1.5;
+            }
+            
+            .disclaimer-box {
+                padding: 15px;
+                margin-bottom: 20px;
+                border-width: 2px;
+            }
+            
+            .disclaimer-box h3 {
+                font-size: 1.1em;
+            }
+            
+            .disclaimer-box p {
+                font-size: 0.9em;
+                margin: 12px 0;
+            }
+            
+            .disclaimer-box p:last-of-type {
+                text-align: left;
+                font-size: 0.95em;
+            }
+            
+            ul, ol {
+                padding-left: 18px;
+            }
+            
+            li {
+                margin-bottom: 6px;
+            }
+            
+            code {
+                font-size: 0.85em;
+                padding: 1px 4px;
+            }
+            
+            hr {
+                margin: 20px 0;
+            }
+            
+            /* Amélioration de la lisibilité sur mobile */
+            p {
+                text-align: justify;
+            }
+            
+            .highlight {
+                font-size: 0.95em;
+            }
+        }
+
+        /* Très petits mobiles (up to 400px) */
+        @media (max-width: 400px) {
+            body {
+                padding: 5px;
+            }
+            
+            .container {
+                padding: 12px;
+            }
+            
+            h1 {
+                font-size: 1.4em;
+            }
+            
+            h2 {
+                font-size: 1.2em;
+            }
+            
+            p, li {
+                font-size: 0.9em;
+            }
+            
+            .disclaimer-box {
+                padding: 12px;
+            }
+            
+            .disclaimer-box h3 {
+                font-size: 1em;
+            }
+            
+            ul, ol {
+                padding-left: 15px;
+            }
+        }
+
+        /* Amélioration pour les très grands écrans */
+        @media (min-width: 1400px) {
+            .container {
+                max-width: 1000px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="disclaimer-box">
+            <h3>IMPORTANT LEGAL DISCLAIMER AND RISK WARNING</h3>
+            <p>
+                The <strong>INKY Tombola</strong> is an <strong>experimental blockchain application</strong> strictly reserved for <strong>$INKY community members</strong>. It is not open to the general public.
+            </p>
+            <p>
+                The <strong>$INKY token has no intrinsic monetary value</strong> and is not a regulated financial instrument. This is <strong>not a licensed financial service</strong> or a regulated form of gambling. Its operation may be <strong>illegal in certain jurisdictions</strong>.
+            </p>
+            <p>
+                Ticket purchase is a <strong>voluntary and irrevocable contribution</strong> to the $INKY ecosystem; tokens used are <strong>automatically burned</strong> to reduce supply, benefiting the community.
+            </p>
+            <p>
+                By participating, you accept the risks associated with using unregulated digital assets. <strong>You could lose your entire $INKY stake.</strong>
+            </p>
+            <p style="text-align: center; font-size: 1.1em;">
+                <strong>PARTICIPATION IN THE INKY TOMBOLA IS ENTIRELY AT YOUR OWN RISK.</strong>
+            </p>
+        </div>
+        
+        <hr>
+
+        <h1>How it works?</h1>
+        <p style="text-align: center; font-size: 1.1em;">
+            Welcome to the INKY Tombola! This guide explains how this transparent and exciting game works. The Tombola is an experimental community rewards game powered by <strong>$INKY</strong>, the first meme coin on the Nexera network. It's a fun and fair way to win a significant prize while contributing to the $INKY ecosystem.
+        </p>
+        
+        <hr>
+
+        <h2>The Prize Pool</h2>
+        <p>
+            A small <span class="highlight">1% tax</span> (adjustable by INKY Council) is applied to every $INKY transaction on the network, automatically funding the designated <strong>Bounty Wallet</strong> (<code class="highlight">0x20dd4f9857A737E4b762bB8857499e22CdA70Edc</code>). This prize is <strong>capped at a maximum amount defined by the community</strong>; any surplus funds exceeding this cap are <strong>automatically burned</strong>, ensuring the pot continuously grows with network activity while contributing to token deflation.
+        </p>
+
+        <h2>How to Participate?</h2>
+        <p>
+            <strong>$INKY holders</strong> can participate by purchasing tickets with their $INKY tokens. The $INKY you spend on tickets is immediately and automatically sent to a <strong>burn address</strong> (<code class="highlight">0x00...dEaD</code>), permanently removing it from circulation. This reduces the total supply of $INKY, which can benefit all holders.
+        </p>
+        <p>
+            To ensure fair play and prevent whale manipulation, there are a few conditions for participation:
+        </p>
+        <ul>
+            <li><strong>Eligibility:</strong> You must hold a minimum amount of $INKY (initially 10k adjustable by INKY Council) in your wallet to be eligible to buy tickets.</li>
+            <li><strong>Maximum Tickets:</strong> The number of tickets you can buy is limited and depends on your current $INKY holdings. This ensures that every participant, regardless of their wallet size, has a fair chance to win. You can find the specific details in the "Max tickets allowed" tooltip on the main page.</li>
+        </ul>
+
+        <h2>The Draw Process</h2>
+        <p>
+            The draw takes place every <span class="highlight">Friday at 3:00 PM UTC</span>. For a draw to occur, two conditions must be met:
+        </p>
+        <ol>
+            <li>There must be a minimum of <span class="highlight">5 participants</span>. If there are fewer than 5, the draw is postponed until the following week.</li>
+            <li>The Bounty Wallet must have a positive $INKY balance. If the prize pool is empty, the draw is also postponed.</li>
+        </ol>
+        <p>
+            This ensures that there's always a worthwhile prize to be won and a healthy level of competition.
+        </p>
+
+        <h2>Transparency & Verifiability</h2>
+        <p>
+            While the draw itself is executed off-chain to keep costs low and provide flexibility, its fairness is built directly on the <strong>transparency and immutability of the blockchain</strong>. Every key parameter of the game, including the ticket price, the minimum $INKY holding for eligibility, the max cap, and the max tickets allowed, are stored on the blockchain itself. This means the community can always propose changes and, if approved, these parameters can be updated for future rounds, nothing is set in stone.
+        </p>
+        <p>
+            Our winning mechanism is designed to be completely <strong>unpredictable</strong> and <strong>verifiable</strong>. It relies on the unpredictable nature of the Nexera Chain. Here's how it works:
+        </p>
+        <ol>
+            <li><strong>Waiting for Blocks:</strong> The system waits for <span class="highlight">5 confirmed blocks</span> on the Nexera mainnet after the draw time. The exact hashes of these blocks are used as the source of randomness. These hashes are created by the Nexera network's consensus mechanism and are impossible to predict.</li>
+            <li><strong>Creating the Seed:</strong> The three Nexera block hashes are combined into a single, long string. This string is then passed through a cryptographic hash function (<strong>keccak256</strong>) to create a unique and truly random "seed."</li>
+            <li><strong>Finding the Winner:</strong>
+                <ul>
+                    <li>This seed is converted into a very large number (<strong>BigInt</strong>).</li>
+                    <li>The <code class="highlight">modulo</code> operation is then applied to this number using the total number of tickets sold for the round. The result is a number that corresponds to a specific ticket index. The tickets are indexed based on their <span class="highlight">order of purchase</span>, so the first ticket bought is index 0, the second is index 1, and so on.</li>
+                    <li>For example, if the seed is <code class="highlight">12345</code> and there are <code class="highlight">100</code> tickets, the calculation would be <code class="highlight">12345 % 100</code>, which gives a result of <code class="highlight">45</code>. The ticket at index <code class="highlight">45</code> (the 46th ticket purchased) is the winning ticket!</li>
+                </ul>
+            </li>
+            <li><strong>Automatic Payout and Burning:</strong> The winner is automatically determined and the prize is instantly transferred to their wallet, free from the tax. Simultaneously, any tokens accumulated above the community-set cap are automatically sent to the Burn Address (<code class="highlight">0x000...dEaD</code>). A new round begins immediately after.</li>
+        </ol>
+        <p>
+            To further guarantee transparency, a detailed <strong>PDF report is generated after every round</strong>. This report contains all the data needed to verify the draw, including the exact block hashes, the winning seed, and the final result. You can check the transaction hashes and block details yourself to verify the fairness of every single draw.
+        </p>
+    </div>
+</body>
+</html>

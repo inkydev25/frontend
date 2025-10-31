@@ -616,6 +616,10 @@
                 grid-template-rows: auto;
                 gap: 10px;
             }
+
+            body {
+                overflow: auto; /* ← Supprimez cette ligne si elle existe */
+            }
             
             /* NOUVELLE ORGANISATION POUR MOBILE/TABLETTE */
             .burned-box { order: 1; }
@@ -732,7 +736,8 @@
         /* Mobile devices */
         @media (max-width: 768px) {
             body {
-                min-height: 200vh; 
+                min-height: 200vh;
+                overflow: auto; 
             }
 
             header nav {
@@ -883,7 +888,8 @@
         /* Small mobile devices */
         @media (max-width: 480px) {
             body {
-                min-height: 250vh; 
+                min-height: 250vh;
+                overflow: auto;  
             }
 
             header nav {
@@ -1037,6 +1043,10 @@
             header nav {
                 gap: 2px; 
                 padding: 3px 5px; 
+            }
+
+            body {
+                overflow: auto; 
             }
 
             .page-title-container {

@@ -1580,14 +1580,18 @@
                 const nextButton = document.getElementById('nextPage');
 
                 try {
-                    // NE PAS AFFICHER le message de chargement pendant les rafraîchissements automatiques
-                    // Seulement l'afficher lors du chargement initial ou changement de page
-                    if (page === 1 && tbody.children.length === 0) {
+                    // Afficher le loading seulement si c'est le chargement initial ET que le tableau est vide
+                    const isInitialLoad = page === 1 && tbody.children.length === 0;
+                    
+                    if (isInitialLoad) {
                         if (loadingMessage) {
                             loadingMessage.style.display = 'block';
                         }
                         if (participantsTable) {
                             participantsTable.style.display = 'none';
+                        }
+                        if (pagination) {
+                            pagination.style.display = 'none';
                         }
                     }
 
@@ -1605,7 +1609,7 @@
                         participantsTable.style.display = 'table';
                     }
 
-                    // Mettre à jour la pagination
+                    // Mettre à jour la pagination IMMÉDIATEMENT
                     const totalPages = Math.ceil(totalParticipantsCount / pageSize);
                     
                     if (pagination) {
@@ -1654,7 +1658,7 @@
                     // Ne mettre à jour le DOM que si les données ont changé
                     const hasChanged = JSON.stringify(currentData) !== JSON.stringify(newData);
                     
-                    if (hasChanged) {
+                    if (hasChanged || isInitialLoad) {
                         tbody.innerHTML = '';
                         
                         // Remplir le tableau avec les données de la page
@@ -1673,8 +1677,7 @@
 
                 } catch (err) {
                     console.error("Failed to update participants table:", err);
-                    // Ne pas afficher d'erreur pendant les rafraîchissements automatiques
-                    // Seulement afficher l'erreur si c'est le chargement initial
+                    // Afficher l'erreur seulement si c'est le chargement initial
                     if (page === 1 && tbody.children.length === 0) {
                         if (loadingMessage) {
                             loadingMessage.textContent = 'Failed to load data.';
@@ -2337,9 +2340,13 @@
                 const fetchedRoundId = await safeCall(ticketSaleRead.currentRoundId(), 1);
                 roundId = fetchedRoundId;
                 
+                // Charger les stats d'abord pour avoir le totalParticipantsCount
+                await updateStats(roundId);
+                
+                // Ensuite charger la table des participants avec la pagination
+                await updateParticipantsTable(roundId, currentPage);
+                
                 await Promise.all([
-                    updateStats(roundId),
-                    updateParticipantsTable(roundId, currentPage),
                     updateWinnersTable(),
                     fetchWinner(),
                     setupEvolutionChart() 
@@ -2359,7 +2366,7 @@
                         }
                     }
                 } else {
-                        await updateButton([]);
+                    await updateButton([]);
                 }
             }
 

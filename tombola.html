@@ -388,6 +388,42 @@
 
         .last-draw-box a:hover { text-decoration: underline; }
 
+        /* ===== PAGINATION STYLES ===== */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+            padding: 8px;
+        }
+
+        .pagination button {
+            background: var(--bg-color-gradient-dark);
+            border: none;
+            color: var(--text-color-light);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: #6C7A89;
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination-info {
+            font-size: 12px;
+            color: var(--text-color-light);
+            opacity: 0.8;
+        }
+
         /* ===== CHART STYLES ===== */
         .legend-box {
             display: flex;
@@ -1233,6 +1269,13 @@
                 <tbody>
                 </tbody>
             </table>
+            
+            <!-- Pagination Controls -->
+            <div class="pagination" style="display: none;">
+                <button id="prevPage" disabled>Previous</button>
+                <span class="pagination-info" id="pageInfo">Page 1 of 1</span>
+                <button id="nextPage" disabled>Next</button>
+            </div>
         </div>
         
         <!-- Last draw information -->
@@ -1333,34 +1376,38 @@
             const EXTERNAL_WALLET = "0x20dd4f9857A737E4b762bB8857499e22CdA70Edc";
             const EXPLORER_BASE_URL = "https://explorer.testnet.nexera.network/tx/";
 
-            let lastAccount = null;
-            let balanceInterval = null;
-            let updatingParticipants = false;
-            let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
-
-            // Contract addresses and ABIs
+            // Nouvelle adresse du contrat
+            const TICKET_SALE_ADDRESS = "0x639A702c53F0c2CB3677691e2C6B22A3c4535A02";
             const INKY_ADDRESS = "0x6EB2C1fE4e3B48af4905A0209658810B61343438";
-            const INKY_ABI = [
-                "function balanceOf(address) view returns (uint256)",
-                "function decimals() view returns (uint8)",
-                "function symbol() view returns (string)"
-            ];
 
-            const TICKET_SALE_ADDRESS = "0xF494Ba7706A556D9af11E9eF5bf2E20F05F4Da33";
+            // Nouveau ABI avec les fonctions optimisées
             const TICKET_SALE_ABI = [
                 "function buyTickets(uint256 _amount) external",
-                "function ticketsBought(uint256 _roundId, address _user) view returns (uint256)",
+                "function getParticipantsPage(uint256 _roundId, uint256 _page, uint256 _pageSize) external view returns (tuple(address wallet, uint256 tickets)[])",
+                "function getRoundStats(uint256 _roundId) external view returns (tuple(uint256 currentRoundId, uint256 totalParticipants, uint256 totalTickets, uint256 roundBurned, uint256 allTimeBurned, uint256 poolBalance, uint256 maxBounty, uint256 ticketPrice, uint256 minBalanceToParticipate))",
+                "function getUserStats(uint256 _roundId, address _user) external view returns (tuple(uint256 inkyBalance, uint256 maxTicketsAllowed, uint256 ticketsBought, bool isEligible))",
                 "function getMaxTicketsAllowed(address _user) view returns (uint256)",
                 "function minBalanceToParticipate() view returns (uint256)",
                 "function currentRoundId() view returns (uint256)",
-                "function getParticipants(uint256 _roundId) view returns (address[])",
-                "function getParticipantCount(uint256 _roundId) view returns (uint256)",
-                "function ticketPrice() view returns (uint256)",
-                "function totalTicketsPerRound(uint256 _roundId) view returns (uint256)",
-                "function totalCostPerRound(uint256 _roundId) view returns (uint256)",
-                "function getBurnedTotalINKY() view returns (uint256)",
                 "function maxBountyAmountINKY() view returns (uint256)"
             ];
+
+            const INKY_ABI = [
+                "function balanceOf(address) view returns (uint256)",
+                "function decimals() view returns (uint8)",
+                "function symbol() view returns (string)",
+                "function allowance(address owner, address spender) view returns (uint256)",
+                "function approve(address spender, uint256 amount) returns (bool)"
+            ];
+
+            let lastAccount = null;
+            let balanceInterval = null;
+            let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
+            
+            // Variables de pagination
+            let currentPage = 1;
+            const pageSize = 15;
+            let totalParticipantsCount = 0;
 
             // Initialize providers and contracts
             const readProvider = new ethers.JsonRpcProvider("https://rpc.testnet.nexera.network");
@@ -1487,128 +1534,156 @@
             }
 
             /**
-             * Updates the current round statistics
+             * Updates the current round statistics using getRoundStats
              */
             async function updateStats(currentRoundId) {
                 roundId = currentRoundId;
-                const [
-                    totalParticipants,
-                    totalTicketsBN,
-                    totalCostBN,
-                    burnedEverBN,
-                    poolBalanceBN,
-                    maxBountyAmountBN,
-                    decimals
-                ] = await Promise.all([
-                    safeCall(ticketSaleRead.getParticipantCount(roundId), 0),
-                    safeCall(ticketSaleRead.totalTicketsPerRound(roundId), 0),
-                    safeCall(ticketSaleRead.totalCostPerRound(roundId), 0),
-                    safeCall(ticketSaleRead.getBurnedTotalINKY(), 0),
-                    safeCall(inkyContract.balanceOf(EXTERNAL_WALLET), 0),
-                    safeCall(ticketSaleRead.maxBountyAmountINKY(), 0),
-                    safeCall(inkyContract.decimals(), 18)
-                ]);
-
-                const totalCost = parseFloat(ethers.formatUnits(totalCostBN, decimals));
-                const burnedEver = parseFloat(ethers.formatUnits(burnedEverBN, decimals)); 
-                const poolBalance = parseFloat(ethers.formatUnits(poolBalanceBN, decimals));
-                const maxamount = parseFloat(ethers.formatUnits(maxBountyAmountBN, 0));
-
-                document.getElementById("totalParticipants").textContent = parseInt(totalParticipants?.toString() || "0");
-                document.getElementById("totalTickets").textContent = parseInt(totalTicketsBN?.toString() || "0");
-                document.getElementById("totalInkyBurned").textContent = totalCost.toLocaleString("en-US");
-                document.getElementById("totalInkyBurnedEver").textContent = burnedEver.toLocaleString("en-US");
-                document.getElementById("externalWalletBalance").textContent = (+poolBalance === 0 ? "0" : poolBalance.toLocaleString("en-US"));
-                document.getElementById("maxCap").textContent = maxamount.toLocaleString("en-US");
-                document.getElementById("currentRound").textContent = roundId;
+                try {
+                    const roundStats = await safeCall(ticketSaleRead.getRoundStats(roundId));
+                    
+                    if (roundStats) {
+                        const decimals = await safeCall(inkyContract.decimals(), 18);
+                        
+                        document.getElementById("totalParticipants").textContent = parseInt(roundStats.totalParticipants?.toString() || "0");
+                        document.getElementById("totalTickets").textContent = parseInt(roundStats.totalTickets?.toString() || "0");
+                        document.getElementById("totalInkyBurned").textContent = parseFloat(ethers.formatUnits(roundStats.roundBurned || 0, decimals)).toLocaleString("en-US");
+                        document.getElementById("totalInkyBurnedEver").textContent = parseFloat(ethers.formatUnits(roundStats.allTimeBurned || 0, decimals)).toLocaleString("en-US");
+                        document.getElementById("externalWalletBalance").textContent = parseFloat(ethers.formatUnits(roundStats.poolBalance || 0, decimals)).toLocaleString("en-US");
+                        
+                        // CORRECTION : maxBounty est en wei, donc on le formate comme les autres valeurs
+                        document.getElementById("maxCap").textContent = parseFloat(ethers.formatUnits(roundStats.maxBounty || 0, decimals)).toLocaleString("en-US");
+                        
+                        document.getElementById("currentRound").textContent = roundId;
+                        
+                        // Mettre à jour le prix du ticket
+                        ticketPrice = parseInt(roundStats.ticketPrice?.toString() || "500");
+                        
+                        // Mettre à jour le total des participants pour la pagination
+                        totalParticipantsCount = parseInt(roundStats.totalParticipants?.toString() || "0");
+                    }
+                } catch (err) {
+                    console.error("Error updating stats:", err);
+                }
             }
 
             /**
-             * Updates the participants table
+             * Updates the participants table avec pagination
              */
-            async function updateParticipantsTable(currentRoundId) {
-                if (updatingParticipants) return;
-                updatingParticipants = true;
-
+            async function updateParticipantsTable(currentRoundId, page = 1) {
                 const participantsBox = document.querySelector('.participants-box');
                 const loadingMessage = participantsBox.querySelector('.loading-message');
                 const participantsTable = participantsBox.querySelector('#participantsTable');
                 const tbody = participantsTable.querySelector('tbody');
+                const pagination = participantsBox.querySelector('.pagination');
+                const pageInfo = document.getElementById('pageInfo');
+                const prevButton = document.getElementById('prevPage');
+                const nextButton = document.getElementById('nextPage');
 
                 try {
-                    const participants = await safeCall(ticketSaleRead.getParticipants(currentRoundId), []);
+                    // NE PAS AFFICHER le message de chargement pendant les rafraîchissements automatiques
+                    // Seulement l'afficher lors du chargement initial ou changement de page
+                    if (page === 1 && tbody.children.length === 0) {
+                        if (loadingMessage) {
+                            loadingMessage.style.display = 'block';
+                        }
+                        if (participantsTable) {
+                            participantsTable.style.display = 'none';
+                        }
+                    }
 
-                    if (loadingMessage && participantsTable) {
+                    // Récupérer la page des participants
+                    const participantsPage = await safeCall(
+                        ticketSaleRead.getParticipantsPage(currentRoundId, page, pageSize), 
+                        []
+                    );
+
+                    // Cacher le message de chargement une fois les données reçues
+                    if (loadingMessage) {
                         loadingMessage.style.display = 'none';
+                    }
+                    if (participantsTable) {
                         participantsTable.style.display = 'table';
                     }
 
-                    // If the list is empty, show "No participants yet" message and exit
-                    if (!participants || participants.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; opacity:0.7;">No participants yet</td></tr>`;
+                    // Mettre à jour la pagination
+                    const totalPages = Math.ceil(totalParticipantsCount / pageSize);
+                    
+                    if (pagination) {
+                        pagination.style.display = totalPages > 1 ? 'flex' : 'none';
+                    }
+                    
+                    if (pageInfo) {
+                        pageInfo.textContent = `Page ${page} of ${totalPages}`;
+                    }
+                    
+                    if (prevButton) {
+                        prevButton.disabled = page <= 1;
+                    }
+                    
+                    if (nextButton) {
+                        nextButton.disabled = page >= totalPages;
+                    }
+
+                    // Si la liste est vide
+                    if (!participantsPage || participantsPage.length === 0) {
+                        if (tbody.children.length === 0 || tbody.children[0].textContent !== "No participants yet") {
+                            tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; opacity:0.7;">No participants yet</td></tr>`;
+                        }
                         return;
                     }
 
-                    // Check if the table contains the "No participants yet" message
-                    const noParticipantsMessage = tbody.querySelector('td[colspan="3"]');
-
-                    // If the message is present and there are participants, clear the table
-                    if (noParticipantsMessage && participants.length > 0) {
-                        tbody.innerHTML = '';
-                    }
-                    
-                    const chunkSize = 100;
-                    const frag = document.createDocumentFragment();
-                    const existingRows = new Map();
-                    
-                    tbody.querySelectorAll('tr').forEach(row => {
-                        if (row.dataset.addr) {
-                            existingRows.set(row.dataset.addr, row);
-                        }
+                    // Vérifier si les données ont réellement changé avant de vider le tableau
+                    const currentData = Array.from(tbody.querySelectorAll('tr')).map(tr => {
+                        const cells = tr.querySelectorAll('td');
+                        return {
+                            id: cells[0].textContent,
+                            wallet: cells[1].getAttribute('title'),
+                            tickets: cells[2].textContent
+                        };
                     });
 
-                    let id = 1;
-                    for (let i = 0; i < participants.length; i += chunkSize) {
-                        const chunk = participants.slice(i, i + chunkSize);
-                        const ticketsBNs = await Promise.all(chunk.map(addr => safeCall(ticketSaleRead.ticketsBought(currentRoundId, addr), 0)));
+                    const newData = participantsPage.map((participant, index) => {
+                        const startId = (page - 1) * pageSize + 1;
+                        return {
+                            id: (startId + index).toString(),
+                            wallet: participant.wallet,
+                            tickets: participant.tickets.toString()
+                        };
+                    });
 
-                        chunk.forEach((addr, j) => {
-                            const tickets = parseInt(ticketsBNs[j]?.toString() || '0');
-                            
-                            if (existingRows.has(addr)) {
-                                const row = existingRows.get(addr);
-                                const ticketCell = row.querySelector("td:nth-child(3)");
-                                if (ticketCell.textContent !== tickets.toString()) {
-                                    ticketCell.textContent = tickets;
-                                }
-                                existingRows.delete(addr);
-                            } else {
-                                const tr = document.createElement("tr");
-                                tr.dataset.addr = addr;
-                                tr.innerHTML = `
-                                    <td><span class="id-cell">${id}</span></td>
-                                    <td title="${addr}">${addr.substring(0,6)}...${addr.slice(-4)}</td>
-                                    <td style="font-weight:600;">${tickets}</td>
-                                `;
-                                frag.appendChild(tr);
-                            }
-                            id++;
+                    // Ne mettre à jour le DOM que si les données ont changé
+                    const hasChanged = JSON.stringify(currentData) !== JSON.stringify(newData);
+                    
+                    if (hasChanged) {
+                        tbody.innerHTML = '';
+                        
+                        // Remplir le tableau avec les données de la page
+                        const startId = (page - 1) * pageSize + 1;
+                        
+                        participantsPage.forEach((participant, index) => {
+                            const tr = document.createElement("tr");
+                            tr.innerHTML = `
+                                <td><span class="id-cell">${startId + index}</span></td>
+                                <td title="${participant.wallet}">${participant.wallet.substring(0,6)}...${participant.wallet.slice(-4)}</td>
+                                <td style="font-weight:600;">${participant.tickets}</td>
+                            `;
+                            tbody.appendChild(tr);
                         });
                     }
-                    
-                    if (frag.children.length > 0) {
-                        tbody.appendChild(frag);
-                    }
+
                 } catch (err) {
                     console.error("Failed to update participants table:", err);
-                    if (loadingMessage) {
-                        loadingMessage.textContent = 'Failed to load data.';
-                        loadingMessage.style.color = 'red';
-                        loadingMessage.style.display = 'block';
+                    // Ne pas afficher d'erreur pendant les rafraîchissements automatiques
+                    // Seulement afficher l'erreur si c'est le chargement initial
+                    if (page === 1 && tbody.children.length === 0) {
+                        if (loadingMessage) {
+                            loadingMessage.textContent = 'Failed to load data.';
+                            loadingMessage.style.color = 'red';
+                            loadingMessage.style.display = 'block';
+                        }
+                        if (participantsTable) participantsTable.style.display = 'none';
+                        if (pagination) pagination.style.display = 'none';
                     }
-                    if (participantsTable) participantsTable.style.display = 'none';
-                } finally {
-                    updatingParticipants = false;
                 }
             }
 
@@ -1617,7 +1692,6 @@
              */
             async function updateWinnersTable() {
                 const historicalBox = document.querySelector('.historical-box');
-                // Specifically target the winners table loading message
                 const loadingMessage = historicalBox.querySelector('.historical-loading-message');
                 const historicalTable = historicalBox.querySelector('#historicalTable');
                 const tbody = historicalTable.querySelector('tbody');
@@ -1669,7 +1743,7 @@
             }
 
             /**
-             * Updates the user's balance and status
+             * Updates the user's balance and status using getUserStats
              */
             async function updateBalance(account) {
                 if (!account) {
@@ -1682,41 +1756,27 @@
                 }
 
                 try {
-                    const [
-                        decimals,
-                        balanceRaw,
-                        minBalanceRaw,
-                        maxAllowedBN,
-                        ticketsBoughtBN
-                    ] = await Promise.all([
-                        safeCall(inkyContract.decimals(), 18),
-                        safeCall(inkyContract.balanceOf(account), 0),
-                        safeCall(ticketSaleRead.minBalanceToParticipate(), 0),
-                        safeCall(ticketSaleRead.getMaxTicketsAllowed(account), 0),
-                        safeCall(ticketSaleRead.ticketsBought(roundId, account), 0)
-                    ]);
+                    const userStats = await safeCall(ticketSaleRead.getUserStats(roundId, account));
+                    
+                    if (userStats) {
+                        const decimals = await safeCall(inkyContract.decimals(), 18);
+                        const balance = parseFloat(ethers.formatUnits(userStats.inkyBalance || 0, decimals));
 
-                    const balance = parseFloat(ethers.formatUnits(balanceRaw, decimals));
-                    const minBalance = parseFloat(ethers.formatUnits(minBalanceRaw, decimals));
-                    let maxAllowed = parseInt(maxAllowedBN?.toString() || "0");
-                    const ticketsBought = parseInt(ticketsBoughtBN?.toString() || "0");
+                        document.getElementById("inkyBalance").textContent = Math.floor(balance).toLocaleString("en-US");
+                        maxTicketsEl.textContent = parseInt(userStats.maxTicketsAllowed?.toString() || "0");
+                        yourTicketsEl.textContent = parseInt(userStats.ticketsBought?.toString() || "0");
 
-                    if (balance < minBalance) maxAllowed = 0;
+                        const statusEl = document.getElementById("status");
+                        if(userStats.isEligible) {
+                            statusEl.textContent = "✅ Eligible";
+                            statusEl.style.color = "limegreen";
+                        } else {
+                            statusEl.textContent = "❌ Not eligible";
+                            statusEl.style.color = "red";
+                        }
 
-                    document.getElementById("inkyBalance").textContent = Math.floor(balance).toLocaleString("en-US");
-                    maxTicketsEl.textContent = maxAllowed;
-                    yourTicketsEl.textContent = ticketsBought;
-
-                    const statusEl = document.getElementById("status");
-                    if(balance >= minBalance && maxAllowed > 0) {
-                        statusEl.textContent = "✅ Eligible";
-                        statusEl.style.color = "limegreen";
-                    } else {
-                        statusEl.textContent = "❌ Not eligible";
-                        statusEl.style.color = "red";
+                        updateTotalPrice();
                     }
-
-                    updateTotalPrice();
                 } catch (err) {
                     console.error("updateBalance failed:", err);
                 }
@@ -2212,11 +2272,7 @@
                     const provider = new ethers.BrowserProvider(window.ethereum);
                     const signer = await provider.getSigner();
                     const ticketSaleContract = new ethers.Contract(TICKET_SALE_ADDRESS, TICKET_SALE_ABI, signer);
-                    const inkyContractWithSigner = new ethers.Contract(INKY_ADDRESS, [
-                        "function decimals() view returns (uint8)",
-                        "function allowance(address owner, address spender) view returns (uint256)",
-                        "function approve(address spender, uint256 amount) returns (bool)"
-                    ], signer);
+                    const inkyContractWithSigner = new ethers.Contract(INKY_ADDRESS, INKY_ABI, signer);
 
                     const decimals = await safeCall(inkyContractWithSigner.decimals(), 18);
                     const totalCostRaw = ethers.parseUnits((ticketPrice * amount).toString(), decimals);
@@ -2244,7 +2300,7 @@
                     await Promise.all([
                         updateBalance(accountAddress),
                         updateStats(roundId),
-                        updateParticipantsTable(roundId)
+                        updateParticipantsTable(roundId, currentPage) // Conserver la page actuelle
                     ]);
 
                 } catch(err) {
@@ -2256,29 +2312,36 @@
                 }
             });
 
+            // ===== PAGINATION EVENT LISTENERS =====
+            document.getElementById('prevPage').addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    updateParticipantsTable(roundId, currentPage);
+                }
+            });
+
+            document.getElementById('nextPage').addEventListener('click', () => {
+                const totalPages = Math.ceil(totalParticipantsCount / pageSize);
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    updateParticipantsTable(roundId, currentPage);
+                }
+            });
+
             // ===== INITIALIZATION FUNCTIONS =====
 
             /**
              * Initializes all data
              */
             async function initializeData() {
-                const [
-                    fetchedRoundId,
-                    fetchedTicketPrice,
-                    fetchedWinnerData
-                ] = await Promise.all([
-                    safeCall(ticketSaleRead.currentRoundId(), 1),
-                    safeCall(ticketSaleRead.ticketPrice(), 500),
-                    fetchWinner()
-                ]);
-
+                const fetchedRoundId = await safeCall(ticketSaleRead.currentRoundId(), 1);
                 roundId = fetchedRoundId;
-                ticketPrice = parseInt(fetchedTicketPrice?.toString() || "500");
                 
                 await Promise.all([
                     updateStats(roundId),
-                    updateParticipantsTable(roundId),
+                    updateParticipantsTable(roundId, currentPage),
                     updateWinnersTable(),
+                    fetchWinner(),
                     setupEvolutionChart() 
                 ]);
                 
@@ -2308,17 +2371,18 @@
                     const currentRound = await safeCall(ticketSaleRead.currentRoundId(), roundId);
                     if (currentRound !== roundId) {
                         roundId = currentRound;
+                        currentPage = 1; // Reset à la première page pour le nouveau round
                         await Promise.all([
                             updateStats(roundId),
-                            updateParticipantsTable(roundId),
-                            fetchWinner(), // Added here to update last winner if a new round starts
-                            updateWinnersTable(), // Added here to update winners history
+                            updateParticipantsTable(roundId, currentPage),
+                            fetchWinner(),
+                            updateWinnersTable(),
                             setupEvolutionChart() 
                         ]);
                     } else {
                         await Promise.all([
                             updateStats(roundId),
-                            updateParticipantsTable(roundId)
+                            updateParticipantsTable(roundId, currentPage)
                         ]);
                     }
                 }, 10000);

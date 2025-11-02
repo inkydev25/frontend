@@ -1359,7 +1359,6 @@
 
     <!-- External libraries -->
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
-    <script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
 
     <!-- Main application script -->
     <script>
@@ -1804,15 +1803,13 @@
             }
 
             // ===== WALLET CONNECTION FUNCTIONS =====
+
+            /**
+             * Gets available EVM providers
+             */
             function getEVMProviders() {
                 if (!window.ethereum) return [];
-                
-                // Si multiple providers
-                if (window.ethereum.providers && window.ethereum.providers.length > 0) {
-                    return window.ethereum.providers;
-                }
-                
-                // Si un seul provider
+                if (window.ethereum.providers && window.ethereum.providers.length > 0) return window.ethereum.providers;
                 return [window.ethereum];
             }
 
@@ -1925,139 +1922,28 @@
             /**
              * Shows the wallet selection popup
              */
-async function showWalletPopup() {
-    popup.innerHTML = '';
-    
-    const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-        // WalletConnect V2 comme launch.nukl.ai
-        const wcBtn = document.createElement('button');
-        wcBtn.textContent = "Connect Wallet";
-        wcBtn.addEventListener('click', async () => {
-            await connectWithWalletConnect();
-        });
-        popup.appendChild(wcBtn);
-        
-        overlay.style.display = 'block';
-        popup.style.display = 'block';
-        return;
-    }
-    
-    // Code PC normal...
-    let providers = getEVMProviders();
-    if (providers.length === 0) { 
-        showError("No EVM wallet detected!"); 
-        return; 
-    }
-    
-    providers.forEach((p) => {
-        const walletName = getWalletName(p);
-        const btn = document.createElement('button');
-        btn.textContent = walletName;
-        btn.addEventListener('click', async () => { 
-            hideWalletPopup(); 
-            await connectWallet(p); 
-        });
-        popup.appendChild(btn);
-    });
-    
-    overlay.style.display = 'block';
-    popup.style.display = 'block';
-}
-
-let walletConnectProvider = null;
-
-async function connectWithWalletConnect() {
-    try {
-        showLoading("🔄 Connecting...");
-        
-        // WalletConnect V1
-        walletConnectProvider = new WalletConnectProvider.default({
-            rpc: {
-                84532: "https://sepolia.base.org" // Base Sepolia
-            },
-            chainId: 84532,
-            qrcodeModalOptions: {
-                mobileLinks: [
-                    "metamask",
-                    "trust",
-                    "rainbow", 
-                    "argent",
-                    "zerion"
-                ]
-            }
-        });
-
-        // Activer la connexion
-        await walletConnectProvider.enable();
-        
-        // Récupérer les comptes
-        const accounts = await walletConnectProvider.request({
-            method: "eth_accounts"
-        });
-        
-        hideWalletPopup();
-        hideLoading();
-
-        if (accounts.length > 0) {
-            // Mettre à jour l'interface
-            await updateWalletConnectUI(accounts[0]);
-        }
-
-    } catch (error) {
-        hideLoading();
-        console.error("WalletConnect error:", error);
-        if (error.message !== "User closed modal") {
-            showError("Connection failed: " + (error.message || error));
-        }
-    }
-}
-
-async function updateWalletConnectUI(account) {
-    button.textContent = `WC: ${account.substring(0, 6)}...${account.slice(-4)}`;
-    button.classList.add('connected');
-    lastAccount = account;
-    await updateBalance(account);
-    
-    // Écouter les déconnexions
-    walletConnectProvider.on("disconnect", () => {
-        button.textContent = "Connect your wallet";
-        button.classList.remove('connected');
-        lastAccount = null;
-        updateBalance(null);
-    });
-}
-
-            async function initSimpleWalletConnect() {
-                try {
-                    showLoading("🔄 Generating QR Code...");
-                    
-                    const provider = new WalletConnectProvider.default({
-                        rpc: {
-                            84532: "https://sepolia.base.org" // Votre RPC
-                        }
-                    });
-
-                    await provider.enable();
-                    
-                    const accounts = await provider.request({ method: "eth_accounts" });
-                    
-                    hideWalletPopup();
-                    hideLoading();
-
-                    if (accounts.length > 0) {
-                        // Connecté avec succès !
-                        button.textContent = `WC: ${accounts[0].substring(0, 6)}...${accounts[0].slice(-4)}`;
-                        button.classList.add('connected');
-                        lastAccount = accounts[0];
-                        await updateBalance(accounts[0]);
-                    }
-
-                } catch (error) {
-                    hideLoading();
-                    console.error("WalletConnect error:", error);
+            function showWalletPopup() {
+                popup.innerHTML = '';
+                let providers = getEVMProviders(); 
+                
+                // If no provider is detected
+                if (providers.length === 0) { 
+                    showError("No EVM-compatible wallet detected!"); 
+                    return; 
                 }
+
+                // Display all found providers, sorting to put MetaMask first
+                providers.sort((a, b) => a.isMetaMask ? -1 : b.isMetaMask ? 1 : 0);
+                providers.forEach((p) => {
+                    const walletName = getWalletName(p);
+                    const btn = document.createElement('button');
+                    btn.textContent = walletName;
+                    // Button calls connectWallet(p)
+                    btn.addEventListener('click', async () => { hideWalletPopup(); await connectWallet(p); });
+                    popup.appendChild(btn);
+                });
+                overlay.style.display = 'block';
+                popup.style.display = 'block';
             }
 
             /**
@@ -2388,44 +2274,21 @@ async function updateWalletConnectUI(account) {
                     
                     if (drawStatus.status === 'en_cours') {
                         showError("A draw is in progress. Ticket purchases are temporarily disabled.");
-                        return;
+                        return; // Exit the function immediately
                     }
                 } catch (err) {
                     console.error("Failed to check draw status:", err);
                     showError("Server is down. Please try later.");
-                    return;
+                    return; // Exit the function if there's an API error
                 }
-                
-                if (!lastAccount) { 
-                    showError("Connect your wallet first"); 
-                    return; 
-                }
-                
+                if (!lastAccount) { showError("Connect your wallet first"); return; }
                 const amount = parseInt(ticketInput.value);
-                if(isNaN(amount) || amount <= 0) { 
-                    showError("Enter a valid number of tickets"); 
-                    return; 
-                }
+                if(isNaN(amount) || amount <= 0) { showError("Enter a valid number of tickets"); return; }
 
                 buyButton.disabled = true;
                 try {
-                    let signer;
-                    let provider;
-                    
-                    // Utiliser WalletConnect si connecté
-                    if (walletConnectProvider && lastAccount) {
-                        provider = new ethers.BrowserProvider(walletConnectProvider);
-                        signer = await provider.getSigner();
-                    } 
-                    // Utiliser le provider normal (MetaMask desktop)
-                    else if (window.ethereum) {
-                        provider = new ethers.BrowserProvider(window.ethereum);
-                        signer = await provider.getSigner();
-                    } else {
-                        showError("No wallet connected");
-                        return;
-                    }
-
+                    const provider = new ethers.BrowserProvider(window.ethereum);
+                    const signer = await provider.getSigner();
                     const ticketSaleContract = new ethers.Contract(TICKET_SALE_ADDRESS, TICKET_SALE_ABI, signer);
                     const inkyContractWithSigner = new ethers.Contract(INKY_ADDRESS, INKY_ABI, signer);
 
@@ -2455,7 +2318,7 @@ async function updateWalletConnectUI(account) {
                     await Promise.all([
                         updateBalance(accountAddress),
                         updateStats(roundId),
-                        updateParticipantsTable(roundId, currentPage)
+                        updateParticipantsTable(roundId, currentPage) // Conserver la page actuelle
                     ]);
 
                 } catch(err) {

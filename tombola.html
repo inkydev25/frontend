@@ -1361,7 +1361,6 @@
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
-<script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
 
     <!-- Main application script -->
     <script>
@@ -1406,7 +1405,6 @@
             let lastAccount = null;
             let balanceInterval = null;
             let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
-            let walletConnectProvider = null;
             
             // Variables de pagination
             let currentPage = 1;
@@ -1492,7 +1490,7 @@
             }
 
             /**
-             * Gets available EVM providers (pour desktop)
+             * Gets available EVM providers
              */
             function getEVMProviders() {
                 if (!window.ethereum) return [];
@@ -1552,7 +1550,7 @@
             }
 
             /**
-             * Connects to a wallet provider (pour desktop)
+             * Connects to a wallet provider
              */
             async function connectWallet(provider) {
                 let finalError = null;
@@ -1607,182 +1605,208 @@
             }
 
             /**
-             * Connect with WalletConnect (Solution pour mobile)
+             * Vérifie si un wallet mobile est disponible via EIP-6963 ou deep links
              */
-            async function connectWithWalletConnect() {
-                try {
-                    showLoading("Initializing WalletConnect...");
-                    
-                    // Créer le provider WalletConnect
-                    walletConnectProvider = new WalletConnectProvider.default({
-                        rpc: {
-                            1: "https://mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161",
-                            56: "https://bsc-dataseed.binance.org/",
-                            137: "https://polygon-rpc.com/",
-                            42161: "https://arb1.arbitrum.io/rpc"
-                        },
-                        chainId: 1, // Ethereum Mainnet par défaut
-                        qrcode: true
+            async function checkMobileWalletAvailability() {
+                const wallets = [];
+                
+                // Test MetaMask via EIP-6963
+                if (window.ethereum?.isMetaMask) {
+                    wallets.push({
+                        name: "MetaMask",
+                        provider: window.ethereum,
+                        type: "injected"
                     });
-
-                    // S'abonner aux événements
-                    walletConnectProvider.on("connect", (error, payload) => {
-                        if (error) {
-                            console.error("WalletConnect connection error:", error);
-                            return;
-                        }
-                        console.log("WalletConnect connected:", payload);
-                    });
-
-                    walletConnectProvider.on("disconnect", (error, payload) => {
-                        console.log("WalletConnect disconnected:", payload);
-                        if (walletConnectProvider) {
-                            walletConnectProvider = null;
-                        }
-                        updateButton([]);
-                    });
-
-                    walletConnectProvider.on("chainChanged", (chainId) => {
-                        console.log("Chain changed:", chainId);
-                        window.location.reload();
-                    });
-
-                    walletConnectProvider.on("accountsChanged", (accounts) => {
-                        console.log("Accounts changed:", accounts);
-                        updateButton(accounts);
-                    });
-
-                    // Établir la connexion
-                    await walletConnectProvider.enable();
-                    
-                    hideLoading();
-                    
-                    // Mettre à jour l'interface avec le compte connecté
-                    const accounts = await walletConnectProvider.request({ method: 'eth_accounts' });
-                    if (accounts && accounts.length > 0) {
-                        isDisconnected = false;
-                        localStorage.setItem("walletDisconnected", "false");
-                        
-                        // Injecter le provider dans window.ethereum pour compatibilité
-                        window.ethereum = walletConnectProvider;
-                        
-                        await updateButton(accounts);
-                        showError("WalletConnect connected successfully!", 3000);
-                    } else {
-                        showError("Failed to connect with WalletConnect");
-                    }
-
-                } catch (error) {
-                    hideLoading();
-                    console.error("WalletConnect error:", error);
-                    if (error.message?.includes("User closed modal")) {
-                        showError("Connection cancelled by user");
-                    } else {
-                        showError("WalletConnect connection failed: " + error.message);
-                    }
                 }
+                
+                // Test via EIP-6963 event
+                window.addEventListener('eip6963:announceProvider', (event) => {
+                    wallets.push({
+                        name: event.detail.info.name,
+                        provider: event.detail.provider,
+                        type: "injected"
+                    });
+                });
+                
+                window.dispatchEvent(new Event("eip6963:requestProvider"));
+                
+                // Attendre un peu pour les réponses EIP-6963
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                return wallets;
             }
 
             /**
-             * Gère la connexion mobile avec deep links (fallback)
+             * Tente de se connecter via un schéma d'URL mobile
+             */
+            async function connectViaMobileDeepLink(wallet) {
+                return new Promise((resolve) => {
+                    // Créer un iframe invisible pour tester la disponibilité
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = wallet.scheme;
+                    
+                    iframe.onload = () => {
+                        document.body.removeChild(iframe);
+                        // Si l'iframe se charge, le wallet est probablement installé
+                        resolve(true);
+                    };
+                    
+                    iframe.onerror = () => {
+                        document.body.removeChild(iframe);
+                        // Si l'iframe échoue, le wallet n'est pas installé
+                        resolve(false);
+                    };
+                    
+                    document.body.appendChild(iframe);
+                    
+                    // Timeout après 2 secondes
+                    setTimeout(() => {
+                        if (document.body.contains(iframe)) {
+                            document.body.removeChild(iframe);
+                        }
+                        resolve(false);
+                    }, 2000);
+                });
+            }
+
+            /**
+             * Gère la connexion mobile
              */
             async function connectMobileWallet(wallet) {
-                if (wallet.deeplink) {
-                    showLoading(`Opening ${wallet.name}... Please approve the connection in your wallet and return to this page.`);
+                if (wallet.provider) {
+                    // Wallet injecté disponible
+                    await connectWallet(wallet.provider);
+                } else if (wallet.scheme) {
+                    // Essayer le deep link
+                    showLoading(`Opening ${wallet.name}...`);
                     
-                    // Ouvrir le deep link
-                    setTimeout(() => {
-                        window.location.href = wallet.deeplink;
-                    }, 1000);
+                    // Test d'abord si le wallet est installé
+                    const isInstalled = await connectViaMobileDeepLink(wallet);
                     
-                    // Stocker l'info pour la détection au retour
-                    localStorage.setItem('mobileWalletPending', wallet.name);
-                    
-                } else {
-                    showError(`${wallet.name} connection not supported yet`);
+                    if (isInstalled) {
+                        // Wallet installé - utiliser le deep link
+                        const deeplink = wallet.deeplink || `${wallet.scheme}${encodeURIComponent(window.location.href)}`;
+                        window.location.href = deeplink;
+                        
+                        // Stocker pour détection au retour
+                        localStorage.setItem('pendingMobileConnection', JSON.stringify({
+                            wallet: wallet.name,
+                            timestamp: Date.now(),
+                            deeplink: deeplink
+                        }));
+                        
+                        // Attendre un peu avant de montrer le message
+                        setTimeout(() => {
+                            showLoading(`Please approve the connection in ${wallet.name} and return to this page. The page will refresh automatically.`);
+                        }, 2000);
+                        
+                    } else {
+                        // Wallet non installé - rediriger vers le store
+                        hideLoading();
+                        if (confirm(`${wallet.name} not found. Would you like to install it?`)) {
+                            window.open(wallet.installUrl, '_blank');
+                        }
+                    }
                 }
             }
 
             /**
-             * Affiche le popup de sélection de wallet
+             * Affiche le popup de sélection de wallet - VERSION CORRECTE
              */
-            function showWalletPopup() {
+            async function showWalletPopup() {
                 popup.innerHTML = '';
                 
-                // Sur mobile, priorité à WalletConnect
-                if (isMobile()) {
-                    // WalletConnect - solution principale
-                    const wcBtn = document.createElement('button');
-                    wcBtn.textContent = "WalletConnect";
-                    wcBtn.style.backgroundColor = '#3b99fc';
-                    wcBtn.style.color = 'white';
-                    wcBtn.addEventListener('click', () => {
-                        hideWalletPopup();
-                        connectWithWalletConnect();
-                    });
-                    popup.appendChild(wcBtn);
+                // Détecter les wallets disponibles
+                const availableWallets = await checkMobileWalletAvailability();
+                const isMobileDevice = isMobile();
+                
+                // Liste des wallets supportés
+                const supportedWallets = [
+                    {
+                        name: "MetaMask",
+                        scheme: "metamask:",
+                        deeplink: `https://metamask.app.link/dapp/${window.location.hostname}${window.location.pathname}`,
+                        installUrl: "https://metamask.io/download/",
+                        provider: availableWallets.find(w => w.name.toLowerCase().includes('metamask'))?.provider
+                    },
+                    {
+                        name: "Trust Wallet", 
+                        scheme: "trust:",
+                        deeplink: `https://link.trustwallet.com/open_url?coin_id=60&url=${encodeURIComponent(window.location.href)}`,
+                        installUrl: "https://trustwallet.com/download",
+                        provider: availableWallets.find(w => w.name.toLowerCase().includes('trust'))?.provider
+                    },
+                    {
+                        name: "Coinbase Wallet",
+                        scheme: "cbwallet:",
+                        deeplink: `https://go.cb-w.com/dapp?url=${encodeURIComponent(window.location.href)}`, 
+                        installUrl: "https://www.coinbase.com/wallet/downloads",
+                        provider: availableWallets.find(w => w.name.toLowerCase().includes('coinbase'))?.provider
+                    },
+                    {
+                        name: "Rabby Wallet",
+                        scheme: "rabby:",
+                        deeplink: "rabby://",
+                        installUrl: "https://rabby.io/",
+                        provider: availableWallets.find(w => w.name.toLowerCase().includes('rabby'))?.provider
+                    },
+                    {
+                        name: "Phantom",
+                        scheme: "phantom:",
+                        deeplink: `https://phantom.app/ul/browse/${encodeURIComponent(window.location.href)}`,
+                        installUrl: "https://phantom.app/download",
+                        provider: availableWallets.find(w => w.name.toLowerCase().includes('phantom'))?.provider
+                    }
+                ];
 
-                    // Séparateur
+                // Ajouter les wallets détectés d'abord
+                availableWallets.forEach(wallet => {
+                    const btn = document.createElement('button');
+                    btn.textContent = `${wallet.name} (Detected)`;
+                    btn.addEventListener('click', async () => { 
+                        hideWalletPopup(); 
+                        await connectWallet(wallet.provider);
+                    });
+                    popup.appendChild(btn);
+                });
+
+                // Ajouter un séparateur si on a des wallets détectés
+                if (availableWallets.length > 0) {
                     const separator = document.createElement('div');
                     separator.style.cssText = 'width:100%; height:1px; background:#ccc; margin:10px 0;';
-                    separator.innerHTML = '<div style="text-align:center; background:#2d3748; margin:-10px auto; width:50px; color:#ccc; font-size:12px;">OR</div>';
                     popup.appendChild(separator);
+                }
 
-                    // Deep links fallback
-                    const mobileWallets = [
-                        { 
-                            name: "MetaMask Mobile", 
-                            deeplink: `https://metamask.app.link/dapp/${window.location.hostname}${window.location.pathname}?connect=true`,
-                        },
-                        { 
-                            name: "Trust Wallet", 
-                            deeplink: `https://link.trustwallet.com/open_url?coin_id=60&url=${encodeURIComponent(window.location.href)}`,
-                        },
-                        { 
-                            name: "Coinbase Wallet", 
-                            deeplink: `https://go.cb-w.com/dapp?url=${encodeURIComponent(window.location.href)}`,
-                        }
-                    ];
-
-                    mobileWallets.forEach(wallet => {
-                        const btn = document.createElement('button');
-                        btn.textContent = wallet.name;
-                        btn.addEventListener('click', () => { 
-                            hideWalletPopup(); 
-                            connectMobileWallet(wallet);
-                        });
-                        popup.appendChild(btn);
-                    });
-
-                } else {
-                    // Sur desktop, utiliser l'ancienne méthode
-                    let providers = getEVMProviders(); 
-                    
-                    if (providers.length === 0) { 
-                        // Option WalletConnect pour desktop aussi
-                        const wcBtn = document.createElement('button');
-                        wcBtn.textContent = "WalletConnect";
-                        wcBtn.style.backgroundColor = '#3b99fc';
-                        wcBtn.style.color = 'white';
-                        wcBtn.addEventListener('click', () => {
-                            hideWalletPopup();
-                            connectWithWalletConnect();
-                        });
-                        popup.appendChild(wcBtn);
+                // Ajouter tous les wallets supportés
+                supportedWallets.forEach(wallet => {
+                    // Ne pas ajouter les wallets déjà détectés
+                    if (availableWallets.some(w => w.name.toLowerCase().includes(wallet.name.toLowerCase()))) {
                         return;
                     }
 
-                    providers.sort((a, b) => a.isMetaMask ? -1 : b.isMetaMask ? 1 : 0);
-                    providers.forEach((p) => {
-                        const walletName = getWalletName(p);
-                        const btn = document.createElement('button');
-                        btn.textContent = walletName;
-                        btn.addEventListener('click', async () => { 
-                            hideWalletPopup(); 
-                            await connectWallet(p); 
-                        });
-                        popup.appendChild(btn);
+                    const btn = document.createElement('button');
+                    
+                    if (isMobileDevice) {
+                        btn.textContent = wallet.name;
+                    } else {
+                        btn.textContent = `${wallet.name} (Mobile)`;
+                    }
+                    
+                    btn.addEventListener('click', async () => { 
+                        hideWalletPopup(); 
+                        await connectMobileWallet(wallet);
                     });
+                    
+                    popup.appendChild(btn);
+                });
+
+                // Si aucun wallet n'est disponible
+                if (availableWallets.length === 0 && !isMobileDevice) {
+                    const message = document.createElement('div');
+                    message.style.cssText = 'text-align:center; padding:10px; color:#ccc; font-size:14px;';
+                    message.textContent = 'No wallets detected. Install a browser extension or use a mobile wallet.';
+                    popup.appendChild(message);
                 }
                 
                 overlay.style.display = 'block';
@@ -1798,35 +1822,54 @@
             }
 
             /**
-             * Vérifie s'il y a une connexion en attente au chargement
+             * Vérifie les connexions mobiles en attente
              */
-            function checkPendingConnection() {
-                const pending = localStorage.getItem('mobileWalletPending');
+            function checkPendingMobileConnections() {
+                const pending = localStorage.getItem('pendingMobileConnection');
                 if (pending) {
-                    showLoading(`Detected ${pending} connection. Please make sure your wallet is connected and refresh the page.`);
-                    localStorage.removeItem('mobileWalletPending');
+                    const connection = JSON.parse(pending);
+                    const timeElapsed = Date.now() - connection.timestamp;
                     
-                    // Auto-refresh après 5 secondes
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 5000);
+                    // Si moins de 5 minutes se sont écoulées
+                    if (timeElapsed < 5 * 60 * 1000) {
+                        showLoading(`Checking ${connection.wallet} connection...`);
+                        
+                        // Vérifier périodiquement si window.ethereum est disponible
+                        const checkInterval = setInterval(() => {
+                            if (window.ethereum) {
+                                clearInterval(checkInterval);
+                                localStorage.removeItem('pendingMobileConnection');
+                                connectWallet(window.ethereum);
+                                hideLoading();
+                            }
+                        }, 1000);
+                        
+                        // Arrêter après 30 secondes
+                        setTimeout(() => {
+                            clearInterval(checkInterval);
+                            hideLoading();
+                            localStorage.removeItem('pendingMobileConnection');
+                            showError(`Could not detect ${connection.wallet} connection. Please try again.`);
+                        }, 30000);
+                    } else {
+                        localStorage.removeItem('pendingMobileConnection');
+                    }
                 }
             }
 
             /**
-             * Nettoie les ressources à la déconnexion
+             * Nettoie à la déconnexion
              */
             function disconnectWallet() {
-                if (walletConnectProvider) {
-                    walletConnectProvider.disconnect();
-                    walletConnectProvider = null;
-                }
                 lastAccount = null;
                 isDisconnected = true;
                 localStorage.setItem("walletDisconnected", "true");
                 updateButton([]);
             }
 
+            // ===== Les autres fonctions restent identiques =====
+            // [Tout le code existant pour fetchWinner, updateStats, updateParticipantsTable, etc.]
+            
             // ===== DATA FETCHING FUNCTIONS =====
 
             /**
@@ -1919,40 +1962,629 @@
              * Updates the participants table avec pagination
              */
             async function updateParticipantsTable(currentRoundId, page = 1) {
-                // ... (le reste du code reste identique) ...
-                // [Garder tout le code existant de updateParticipantsTable]
+                const participantsBox = document.querySelector('.participants-box');
+                const loadingMessage = participantsBox.querySelector('.loading-message');
+                const participantsTable = participantsBox.querySelector('#participantsTable');
+                const tbody = participantsTable.querySelector('tbody');
+                const pagination = participantsBox.querySelector('.pagination');
+                const pageInfo = document.getElementById('pageInfo');
+                const prevButton = document.getElementById('prevPage');
+                const nextButton = document.getElementById('nextPage');
+
+                try {
+                    // Vérifier si on a déjà des données ou le message "No participants yet"
+                    const hasNoParticipantsMessage = tbody.children.length === 1 && 
+                                                tbody.children[0].querySelector('td[colspan="3"]') && 
+                                                tbody.children[0].textContent.includes("No participants yet");
+                    
+                    const hasRealData = tbody.children.length > 0 && !hasNoParticipantsMessage;
+                    
+                    // Afficher le loading SEULEMENT pour le vrai premier chargement (tableau complètement vide)
+                    const isTrueInitialLoad = page === 1 && tbody.children.length === 0;
+                    
+                    if (isTrueInitialLoad) {
+                        if (loadingMessage) {
+                            loadingMessage.style.display = 'block';
+                        }
+                        if (participantsTable) {
+                            participantsTable.style.display = 'none';
+                        }
+                        if (pagination) {
+                            pagination.style.display = 'none';
+                        }
+                    }
+
+                    // Récupérer la page des participants
+                    const participantsPage = await safeCall(
+                        ticketSaleRead.getParticipantsPage(currentRoundId, page, pageSize), 
+                        []
+                    );
+
+                    // Cacher le message de chargement une fois les données reçues
+                    if (loadingMessage) {
+                        loadingMessage.style.display = 'none';
+                    }
+                    if (participantsTable) {
+                        participantsTable.style.display = 'table';
+                    }
+
+                    // Mettre à jour la pagination
+                    const totalPages = Math.ceil(totalParticipantsCount / pageSize);
+                    
+                    if (pagination) {
+                        pagination.style.display = totalPages > 1 ? 'flex' : 'none';
+                    }
+                    
+                    if (pageInfo) {
+                        pageInfo.textContent = `Page ${page} of ${totalPages}`;
+                    }
+                    
+                    if (prevButton) {
+                        prevButton.disabled = page <= 1;
+                    }
+                    
+                    if (nextButton) {
+                        nextButton.disabled = page >= totalPages;
+                    }
+
+                    // Si la liste est vide
+                    if (!participantsPage || participantsPage.length === 0) {
+                        // Ne mettre à jour que si le message n'est pas déjà affiché
+                        if (!hasNoParticipantsMessage) {
+                            tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; opacity:0.7;">No participants yet</td></tr>`;
+                        }
+                        return;
+                    }
+
+                    // Vérifier si les données ont réellement changé avant de vider le tableau
+                    const currentData = Array.from(tbody.querySelectorAll('tr'))
+                        .filter(tr => !tr.querySelector('td[colspan="3"]')) // Exclure le message "No participants"
+                        .map(tr => {
+                            const cells = tr.querySelectorAll('td');
+                            return {
+                                id: cells[0].textContent,
+                                wallet: cells[1].getAttribute('title'),
+                                tickets: cells[2].textContent
+                            };
+                        });
+
+                    const newData = participantsPage.map((participant, index) => {
+                        const startId = (page - 1) * pageSize + 1;
+                        return {
+                            id: (startId + index).toString(),
+                            wallet: participant.wallet,
+                            tickets: participant.tickets.toString()
+                        };
+                    });
+
+                    // Déterminer si une mise à jour est nécessaire
+                    const needsUpdate = 
+                        // Cas 1: On passe de "No participants" à des participants
+                        (hasNoParticipantsMessage && participantsPage.length > 0) ||
+                        // Cas 2: On a des données qui ont changé
+                        (hasRealData && JSON.stringify(currentData) !== JSON.stringify(newData)) ||
+                        // Cas 3: Vrai chargement initial
+                        isTrueInitialLoad;
+
+                    if (needsUpdate) {
+                        tbody.innerHTML = '';
+                        
+                        // Remplir le tableau avec les données de la page
+                        const startId = (page - 1) * pageSize + 1;
+                        
+                        participantsPage.forEach((participant, index) => {
+                            const tr = document.createElement("tr");
+                            tr.dataset.addr = participant.wallet;
+                            tr.innerHTML = `
+                                <td><span class="id-cell">${startId + index}</span></td>
+                                <td title="${participant.wallet}">${participant.wallet.substring(0,6)}...${participant.wallet.slice(-4)}</td>
+                                <td style="font-weight:600;">${participant.tickets}</td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+                    }
+
+                } catch (err) {
+                    console.error("Failed to update participants table:", err);
+                    // Afficher l'erreur seulement pour le vrai chargement initial
+                    if (page === 1 && tbody.children.length === 0) {
+                        if (loadingMessage) {
+                            loadingMessage.textContent = 'Failed to load data.';
+                            loadingMessage.style.color = 'red';
+                            loadingMessage.style.display = 'block';
+                        }
+                        if (participantsTable) participantsTable.style.display = 'none';
+                        if (pagination) pagination.style.display = 'none';
+                    }
+                }
             }
 
             /**
              * Updates the historical winners table
              */
             async function updateWinnersTable() {
-                // ... (le reste du code reste identique) ...
-                // [Garder tout le code existant de updateWinnersTable]
+                const historicalBox = document.querySelector('.historical-box');
+                const loadingMessage = historicalBox.querySelector('.historical-loading-message');
+                const historicalTable = historicalBox.querySelector('#historicalTable');
+                const tbody = historicalTable.querySelector('tbody');
+
+                try {
+                    const response = await fetch('http://localhost:3000/winners');
+                    if (!response.ok) {
+                        if (loadingMessage) {
+                            loadingMessage.textContent = 'Failed to load data.';
+                            loadingMessage.style.color = 'red';
+                            loadingMessage.style.display = 'block';
+                        }
+                        if (historicalTable) historicalTable.style.display = 'none';
+                        throw new Error(`Cannot fetch winners: ${response.statusText}`);
+                    }
+                    
+                    const winners = await response.json();
+
+                    if (loadingMessage) loadingMessage.style.display = 'none';
+                    if (historicalTable) historicalTable.style.display = 'table';
+                    
+                    tbody.innerHTML = '';
+
+                    if (winners.length === 0) {
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `<td colspan="3" style="text-align:center; opacity:0.7;">No winners yet</td>`;
+                        tbody.appendChild(tr);
+                        return;
+                    }
+
+                    winners.forEach(winner => {
+                        const tr = document.createElement("tr");
+                        tr.innerHTML = `
+                            <td><span class="addr-abbr" title="${winner.winner}">${winner.winner.substring(0, 6)}...${winner.winner.slice(-4)}</span></td>
+                            <td>${parseInt(winner.prizeAmount)}</td>
+                            <td>${new Date(winner.drawDateUTC).toLocaleDateString()}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } catch (err) {
+                    console.error("Failed to update winners table:", err);
+                    if (loadingMessage) {
+                        loadingMessage.textContent = 'Failed to load data.';
+                        loadingMessage.style.color = 'red';
+                        loadingMessage.style.display = 'block';
+                    }
+                    if (historicalTable) historicalTable.style.display = 'none';
+                }
             }
 
             /**
              * Updates the user's balance and status using getUserStats
              */
             async function updateBalance(account) {
-                // ... (le reste du code reste identique) ...
-                // [Garder tout le code existant de updateBalance]
+                if (!account) {
+                    document.getElementById("inkyBalance").textContent = "-";
+                    maxTicketsEl.textContent = "-";
+                    yourTicketsEl.textContent = "-";
+                    document.getElementById("status").textContent = "-";
+                    document.getElementById("status").style.color = "#fff";
+                    return;
+                }
+
+                try {
+                    const userStats = await safeCall(ticketSaleRead.getUserStats(roundId, account));
+                    
+                    if (userStats) {
+                        const decimals = await safeCall(inkyContract.decimals(), 18);
+                        const balance = parseFloat(ethers.formatUnits(userStats.inkyBalance || 0, decimals));
+
+                        document.getElementById("inkyBalance").textContent = Math.floor(balance).toLocaleString("en-US");
+                        maxTicketsEl.textContent = parseInt(userStats.maxTicketsAllowed?.toString() || "0");
+                        yourTicketsEl.textContent = parseInt(userStats.ticketsBought?.toString() || "0");
+
+                        const statusEl = document.getElementById("status");
+                        if(userStats.isEligible) {
+                            statusEl.textContent = "✅ Eligible";
+                            statusEl.style.color = "limegreen";
+                        } else {
+                            statusEl.textContent = "❌ Not eligible";
+                            statusEl.style.color = "red";
+                        }
+
+                        updateTotalPrice();
+                    }
+                } catch (err) {
+                    console.error("updateBalance failed:", err);
+                }
             }
 
             // ===== COUNTDOWN FUNCTION =====
-            // ... (garder tout le code existant de countdown) ...
+
+            /**
+             * Updates the countdown timer
+             */
+            async function updateCountdown() {
+                try {
+                    const now = new Date();
+                    const countdownElement = document.getElementById('countdown');
+                    const buyButton = document.getElementById('buyButton');
+                    
+                    const FIVE_MINUTES_MS = 5 * 60 * 1000; 
+                    const DEFAULT_BUTTON_TEXT = "Buy Tickets";
+
+                    const wasBlinking = countdownElement && countdownElement.classList.contains('blinking-text');
+
+                    // 1. Get draw status
+                    const drawStatusResponse = await fetch('http://localhost:3000/api/draw-status');
+                    const drawStatus = await drawStatusResponse.json();
+
+                    // STATE 1: DRAW IN PROGRESS (status === 'en_cours')
+                    if (drawStatus.status === 'en_cours') {
+                        if (countdownElement) {
+                            countdownElement.textContent = '00:00:00:00';
+                            countdownElement.classList.add('blinking-text');
+                        }
+                        if (buyButton) {
+                            buyButton.disabled = true;
+                            buyButton.textContent = "In Progress";
+                        }
+                        return;
+                    }
+
+                    // If status is no longer "en_cours" and text was blinking, refresh
+                    if (wasBlinking) {
+                        console.log('Draw finished, reloading page...');
+                        location.reload();
+                        return; 
+                    }
+
+                    // *** Removal of reactivation here to avoid blinking ***
+                    
+                    // 2. Get information to calculate next draw
+                    const drawInfoResponse = await fetch('http://localhost:3000/api/draw-info');
+                    if (!drawInfoResponse.ok) {
+                        throw new Error('Failed to fetch draw info');
+                    }
+                    const drawInfo = await drawInfoResponse.json();
+                    const DRAW_HOUR_UTC = drawInfo.scheduleHour;
+                    const DRAW_MINUTE_UTC = drawInfo.scheduleMinute;
+                    const DRAW_DAY_OF_WEEK = drawInfo.scheduleDayOfWeek;
+
+                    // 3. Calculate next draw date and time
+                    const lastDrawDate = drawStatus.lastDrawDate ? new Date(drawStatus.lastDrawDate) : new Date(0);
+                    const nextDraw = new Date(lastDrawDate);
+                    nextDraw.setUTCHours(DRAW_HOUR_UTC, DRAW_MINUTE_UTC, 0, 0);
+
+                    while (nextDraw.getUTCDay() !== DRAW_DAY_OF_WEEK || nextDraw.getTime() <= now.getTime()) {
+                        nextDraw.setUTCDate(nextDraw.getUTCDate() + 1);
+                    }
+                    
+                    if (countdownElement) {
+                        countdownElement.classList.remove('blinking-text');
+                    }
+
+                    // CALCULATE TIME REMAINING
+                    const timeRemaining = nextDraw.getTime() - now.getTime();
+                    
+                    // BUTTON STATE MANAGEMENT
+                    if (buyButton) {
+                        if (timeRemaining > 0 && timeRemaining <= FIVE_MINUTES_MS) {
+                            // STATE A: IMMINENT DRAW (less than 5 minutes)
+                            buyButton.disabled = true;
+                            buyButton.textContent = "Draw coming"; 
+                        } else {
+                            // STATE B: NORMAL (more than 5 minutes)
+                            buyButton.disabled = false;
+                            buyButton.textContent = DEFAULT_BUTTON_TEXT;
+                        }
+                    }
+                    
+                    // UPDATE COUNTDOWN
+                    const days = Math.floor(timeRemaining / (1000 * 60 * 60 * 24));
+                    const hours = Math.floor((timeRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
+
+                    const formattedDays = String(days).padStart(2, '0');
+                    const formattedHours = String(hours).padStart(2, '0');
+                    const formattedMinutes = String(minutes).padStart(2, '0');
+                    const formattedSeconds = String(seconds).padStart(2, '0');
+
+                    if (countdownElement) {
+                        countdownElement.textContent = `${formattedDays}:${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
+                    }
+                } catch (error) {
+                    console.error('Error fetching draw info or status:', error);
+                    const countdownElement = document.getElementById('countdown');
+                    if (countdownElement) {
+                        countdownElement.textContent = 'Server down';
+                        countdownElement.classList.remove('blinking-text');
+                    }
+                }
+            }
 
             // ===== CHART FUNCTIONS =====
-            // ... (garder tout le code existant des charts) ...
+
+            /**
+             * Sets up the evolution chart
+             */
+            async function setupEvolutionChart() {
+                const loadingMessage = document.querySelector('.chart-loading-message');
+                const chartWrapper = document.querySelector('.chart-wrapper');
+                const canvas = document.getElementById('evolutionChart');
+                const historicalBox = document.querySelector('.historical-box');
+                const participantsBox = document.querySelector('.participants-box');
+                const mainContainer = document.querySelector('main');
+                
+                try {
+                    const response = await fetch('http://localhost:3000/winners');
+                    if (!response.ok) {
+                        console.error("Failed to fetch data for the chart.");
+                        if (loadingMessage) {
+                            loadingMessage.textContent = 'Failed to load data.';
+                            loadingMessage.style.color = 'red';
+                        }
+                        return;
+                    }
+
+                    const winners = await response.json();
+                    
+                    if (winners.length === 0) {
+                        if (loadingMessage) {
+                            loadingMessage.textContent = 'No data available yet.';
+                        }
+                        if (chartWrapper) {
+                            chartWrapper.style.display = 'block';
+                        }
+                        return;
+                    }
+
+                    if (loadingMessage) {
+                        loadingMessage.style.display = 'none';
+                    }
+
+                    const sortedWinners = winners.sort((a, b) => a.roundId - b.roundId);
+                    const labels = sortedWinners.map(w => `Round ${w.roundId}`);
+                    const participantData = sortedWinners.map(w => w.numberOfParticipants);
+                    const ticketData = sortedWinners.map(w => w.totalTickets);
+
+                    const numberOfRounds = sortedWinners.length;
+                    const roundsPerView = 5;
+                    const baseWidthPerRound = 120;
+                    const effectiveWidth = Math.max(roundsPerView * baseWidthPerRound, numberOfRounds * baseWidthPerRound);
+
+                    canvas.width = effectiveWidth;
+                    canvas.height = chartWrapper.clientHeight;
+
+                    const ctx = canvas.getContext('2d');
+
+                    if (window.myEvolutionChart instanceof Chart) {
+                        window.myEvolutionChart.destroy();
+                    }
+
+                    window.myEvolutionChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Participants',
+                                data: participantData,
+                                borderColor: 'rgb(75, 192, 192)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                yAxisID: 'y-participants',
+                                tension: 0.2,
+                                fill: true
+                            }, {
+                                label: 'Tickets',
+                                data: ticketData,
+                                borderColor: 'rgb(255, 99, 132)',
+                                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                yAxisID: 'y-tickets',
+                                tension: 0.2,
+                                fill: true
+                            }]
+                        },
+                        options: {
+                            responsive: false,
+                            maintainAspectRatio: false,
+                            scales: {
+                                x: {
+                                    ticks: { color: '#E0E6ED' },
+                                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                                },
+                                'y-participants': {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'left',
+                                    title: {
+                                        display: true,
+                                        text: 'Participants',
+                                        color: 'rgb(75, 192, 192)'
+                                    },
+                                    ticks: { color: 'rgb(75, 192, 192)', precision: 0 },
+                                    grid: { color: 'rgba(75, 192, 192, 0.3)' },
+                                    beginAtZero: true
+                                },
+                                'y-tickets': {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'right',
+                                    title: {
+                                        display: true,
+                                        text: 'Tickets',
+                                        color: 'rgb(255, 99, 132)'
+                                    },
+                                    ticks: { color: 'rgb(255, 99, 132)', precision: 0 },
+                                    grid: { drawOnChartArea: false, color: 'rgba(255, 99, 132, 0.3)' },
+                                    beginAtZero: true
+                                }
+                            },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    enabled: true,
+                                    mode: 'index',
+                                    intersect: false,
+                                    backgroundColor: 'rgba(81, 100, 118, 0.9)',
+                                    callbacks: {
+                                        title: function(context) { return context[0].label; },
+                                        label: function(context) {
+                                            let label = context.dataset.label || '';
+                                            if (label) { label += ': '; }
+                                            if (context.parsed.y !== null) { label += context.parsed.y; }
+                                            return label;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    if (chartWrapper && numberOfRounds > roundsPerView) {
+                        const scrollOffset = effectiveWidth - chartWrapper.clientWidth;
+                        chartWrapper.scrollLeft = scrollOffset;
+                    }
+                    
+                    // Alignment calculation is now done without delay
+                    const chartBox = document.querySelector('.chart-box');
+                    if (!chartBox) return;
+
+                    const chartBoxBottom = chartBox.getBoundingClientRect().bottom;
+                    const mainContainerTop = mainContainer.getBoundingClientRect().top;
+                    const chartBoxBottomRelativeToMain = chartBoxBottom - mainContainerTop;
+
+                    const historicalBoxTopRelativeToMain = historicalBox.getBoundingClientRect().top - mainContainerTop;
+                    const participantsBoxTopRelativeToMain = participantsBox.getBoundingClientRect().top - mainContainerTop;
+
+                    const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
+                    const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
+
+                    historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
+                    participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
+
+                } catch (error) {
+                    console.error("Error fetching or rendering chart data:", error);
+                    if (loadingMessage) {
+                        loadingMessage.textContent = 'Failed to load data.';
+                        loadingMessage.style.color = 'red';
+                    }
+                }
+            }
 
             // ===== CONTAINER ALIGNMENT FUNCTION =====
-            // ... (garder tout le code existant d'alignement) ...
+
+            /**
+             * Aligns container heights for proper layout
+             */
+            function alignContainerHeights() {
+              const mainContainer = document.querySelector('main');
+              const chartBox = document.querySelector('.chart-box');
+              const historicalBox = document.querySelector('.historical-box');
+              const participantsBox = document.querySelector('.participants-box');
+              
+              // Essential check that all elements exist
+              if (!mainContainer || !chartBox || !historicalBox || !participantsBox) return;
+
+              // 1. Get reference positions
+              const mainContainerTop = mainContainer.getBoundingClientRect().top;
+
+              // 2. The bottom of the chart is our REFERENCE ALIGNMENT
+              const chartBoxBottom = chartBox.getBoundingClientRect().bottom;
+              const chartBoxBottomRelativeToMain = chartBoxBottom - mainContainerTop;
+
+              // 3. Get the TOP position of the table containers
+              const historicalBoxTopRelativeToMain = historicalBox.getBoundingClientRect().top - mainContainerTop;
+              const participantsBoxTopRelativeToMain = participantsBox.getBoundingClientRect().top - mainContainerTop;
+
+              // 4. Calculate max height: (Chart Bottom) - (Table Top) - (Grid Gap)
+              const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
+              const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
+
+              // 5. Apply calculated height
+              // This max-height activates the scrollbar (overflow-y: auto)
+              historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
+              participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
+            }
 
             // ===== TICKET PURCHASE FUNCTION =====
-            // ... (garder tout le code existant d'achat) ...
+
+            /**
+             * Handles ticket purchase
+             */
+            buyButton.addEventListener('click', async () => {
+                try {
+                    const drawStatusResponse = await fetch('http://localhost:3000/api/draw-status');
+                    const drawStatus = await drawStatusResponse.json();
+                    
+                    if (drawStatus.status === 'en_cours') {
+                        showError("A draw is in progress. Ticket purchases are temporarily disabled.");
+                        return; // Exit the function immediately
+                    }
+                } catch (err) {
+                    console.error("Failed to check draw status:", err);
+                    showError("Server is down. Please try later.");
+                    return; // Exit the function if there's an API error
+                }
+                if (!lastAccount) { showError("Connect your wallet first"); return; }
+                const amount = parseInt(ticketInput.value);
+                if(isNaN(amount) || amount <= 0) { showError("Enter a valid number of tickets"); return; }
+
+                buyButton.disabled = true;
+                try {
+                    const provider = new ethers.BrowserProvider(window.ethereum);
+                    const signer = await provider.getSigner();
+                    const ticketSaleContract = new ethers.Contract(TICKET_SALE_ADDRESS, TICKET_SALE_ABI, signer);
+                    const inkyContractWithSigner = new ethers.Contract(INKY_ADDRESS, INKY_ABI, signer);
+
+                    const decimals = await safeCall(inkyContractWithSigner.decimals(), 18);
+                    const totalCostRaw = ethers.parseUnits((ticketPrice * amount).toString(), decimals);
+
+                    const accountAddress = await safeCall(signer.getAddress(), null);
+                    if (!accountAddress) throw new Error("Cannot get wallet address");
+
+                    const allowance = await safeCall(inkyContractWithSigner.allowance(accountAddress, ticketSaleContract.target), 0);
+                    if (allowance < totalCostRaw) {
+                        showLoading("⏳ Waiting for approval...");
+                        const approveTx = await safeCall(inkyContractWithSigner.approve(ticketSaleContract.target, totalCostRaw));
+                        if(!approveTx) throw new Error("Approval failed or rejected");
+                        await safeCall(approveTx.wait());
+                        hideLoading();
+                    }
+
+                    showLoading("⏳ Waiting for ticket purchase...");
+                    const tx = await safeCall(ticketSaleContract.buyTickets(amount));
+                    if(!tx) throw new Error("Purchase failed or rejected");
+                    await safeCall(tx.wait());
+                    showLoading('✅ Purchase successful! <img src="inky-logo.png" style="width:74px; vertical-align:middle; margin-left:6px;">');
+                    setTimeout(() => { hideLoading(); }, 3000);
+
+                    const roundId = await safeCall(ticketSaleRead.currentRoundId(), 1);
+                    await Promise.all([
+                        updateBalance(accountAddress),
+                        updateStats(roundId),
+                        updateParticipantsTable(roundId, currentPage) // Conserver la page actuelle
+                    ]);
+
+                } catch(err) {
+                    hideLoading();
+                    console.error("Transaction error:", err);
+                    showError("Transaction failed: " + (err?.message || err));
+                } finally {
+                    buyButton.disabled = false;
+                }
+            });
 
             // ===== PAGINATION EVENT LISTENERS =====
-            // ... (garder tout le code existant de pagination) ...
+            document.getElementById('prevPage').addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    updateParticipantsTable(roundId, currentPage);
+                }
+            });
+
+            document.getElementById('nextPage').addEventListener('click', () => {
+                const totalPages = Math.ceil(totalParticipantsCount / pageSize);
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    updateParticipantsTable(roundId, currentPage);
+                }
+            });
 
             // ===== INITIALIZATION FUNCTIONS =====
 
@@ -1992,8 +2624,8 @@
                     await updateButton([]);
                 }
 
-                // Vérifier les connexions en attente
-                checkPendingConnection();
+                // Vérifier les connexions mobiles en attente
+                checkPendingMobileConnections();
             }
 
             /**
@@ -2049,6 +2681,7 @@
             startUpdateIntervals();
         });
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 </html>

@@ -1803,14 +1803,41 @@
             }
 
             // ===== WALLET CONNECTION FUNCTIONS =====
-
-            /**
-             * Gets available EVM providers
-             */
             function getEVMProviders() {
-                if (!window.ethereum) return [];
-                if (window.ethereum.providers && window.ethereum.providers.length > 0) return window.ethereum.providers;
-                return [window.ethereum];
+                // Pour les wallets mobiles qui injectent directement window.ethereum
+                if (window.ethereum) {
+                    // Cas 1: Multiple providers (MetaMask, WalletConnect, etc.)
+                    if (window.ethereum.providers && window.ethereum.providers.length > 0) {
+                        return window.ethereum.providers;
+                    }
+                    // Cas 2: Provider unique
+                    return [window.ethereum];
+                }
+                
+                // Pour les wallets mobiles spécifiques
+                const mobileProviders = [];
+                
+                // Trust Wallet
+                if (window.trustwallet) {
+                    mobileProviders.push(window.trustwallet);
+                }
+                
+                // Coinbase Wallet
+                if (window.coinbaseWalletExtension) {
+                    mobileProviders.push(window.coinbaseWalletExtension);
+                }
+                
+                // Brave Wallet
+                if (window.braveEthereum) {
+                    mobileProviders.push(window.braveEthereum);
+                }
+                
+                // D'autres wallets mobiles
+                if (window.web3 && !window.ethereum) {
+                    mobileProviders.push(window.web3.currentProvider);
+                }
+                
+                return mobileProviders.length > 0 ? mobileProviders : [];
             }
 
             function getWalletName(p) { 

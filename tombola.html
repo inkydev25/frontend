@@ -1919,56 +1919,114 @@
             }
 
             /**
-             * Shows the wallet selection popup - MODIFIÉ POUR MOBILE
+             * Détecte les wallets mobiles disponibles
+             */
+            function detectMobileWallets() {
+                const wallets = [];
+                
+                // Détection basée sur userAgent et APIs disponibles
+                if (window.ethereum) {
+                    // Si window.ethereum existe déjà, on l'utilise
+                    wallets.push({
+                        name: "Browser Wallet",
+                        provider: window.ethereum,
+                        type: "injected"
+                    });
+                }
+                
+                // Détection pour Coinbase Wallet
+                if (window.coinbaseWalletExtension) {
+                    wallets.push({
+                        name: "Coinbase Wallet",
+                        provider: window.coinbaseWalletExtension,
+                        type: "coinbase"
+                    });
+                }
+                
+                // Détection pour Rabby Wallet
+                if (window.rabby && window.rabby.ethereum) {
+                    wallets.push({
+                        name: "Rabby Wallet", 
+                        provider: window.rabby.ethereum,
+                        type: "rabby"
+                    });
+                }
+                
+                // Détection pour Trust Wallet
+                if (window.trustwallet) {
+                    wallets.push({
+                        name: "Trust Wallet",
+                        provider: window.trustwallet,
+                        type: "trust"
+                    });
+                }
+                
+                // Détection générique pour autres wallets
+                if (window.ethereum && !wallets.some(w => w.type === "injected")) {
+                    wallets.push({
+                        name: "Ethereum Wallet",
+                        provider: window.ethereum,
+                        type: "generic"
+                    });
+                }
+                
+                return wallets;
+            }
+
+            /**
+             * Shows the wallet selection popup - CORRIGÉ POUR MOBILE
              */
             function showWalletPopup() {
                 popup.innerHTML = '';
-                let providers = getEVMProviders(); 
                 
-                // If no provider is detected, show mobile wallet options
-                if (providers.length === 0) { 
-                    // Options pour mobile
-                    const mobileWallets = [
-                        { name: "MetaMask Mobile", id: "metamask", url: "https://metamask.app.link/dapp/" + window.location.hostname },
-                        { name: "Trust Wallet", id: "trust", url: "https://link.trustwallet.com/dapp/" + window.location.hostname },
-                        { name: "Coinbase Wallet", id: "coinbase", url: "https://go.cb-w.com/dapp?url=" + window.location.href },
-                        { name: "Rabby Wallet", id: "rabby", url: "https://rabby.io/" },
-                        { name: "WalletConnect", id: "walletconnect", url: "#", action: "walletconnect" }
-                    ];
-
-                    mobileWallets.forEach(wallet => {
+                // D'abord essayer de détecter les wallets disponibles
+                const availableWallets = detectMobileWallets();
+                
+                if (availableWallets.length > 0) {
+                    // Afficher les wallets détectés
+                    availableWallets.forEach(wallet => {
                         const btn = document.createElement('button');
                         btn.textContent = wallet.name;
-                        btn.dataset.walletId = wallet.id;
-                        
-                        if (wallet.action === "walletconnect") {
-                            btn.addEventListener('click', () => {
-                                showError("WalletConnect integration à implémenter");
-                            });
-                        } else {
-                            btn.addEventListener('click', () => {
-                                window.open(wallet.url, '_blank');
-                            });
-                        }
-                        
+                        btn.addEventListener('click', async () => { 
+                            hideWalletPopup(); 
+                            await connectWallet(wallet.provider);
+                        });
                         popup.appendChild(btn);
                     });
+                } else {
+                    // Si aucun wallet détecté, utiliser l'approche standard
+                    let providers = getEVMProviders(); 
                     
-                    overlay.style.display = 'block';
-                    popup.style.display = 'block';
-                    return;
+                    // If no provider is detected
+                    if (providers.length === 0) { 
+                        const btn = document.createElement('button');
+                        btn.textContent = "No wallet detected";
+                        btn.disabled = true;
+                        popup.appendChild(btn);
+                        
+                        // Option pour installer MetaMask
+                        const installBtn = document.createElement('button');
+                        installBtn.textContent = "Install MetaMask";
+                        installBtn.addEventListener('click', () => {
+                            window.open('https://metamask.io/download/', '_blank');
+                        });
+                        popup.appendChild(installBtn);
+                    } else {
+                        // Display all found providers, sorting to put MetaMask first
+                        providers.sort((a, b) => a.isMetaMask ? -1 : b.isMetaMask ? 1 : 0);
+                        providers.forEach((p) => {
+                            const walletName = getWalletName(p);
+                            const btn = document.createElement('button');
+                            btn.textContent = walletName;
+                            btn.addEventListener('click', async () => { 
+                                hideWalletPopup(); 
+                                await connectWallet(p); 
+                            });
+                            popup.appendChild(btn);
+                        });
+                    }
                 }
-
-                // Display all found providers, sorting to put MetaMask first
-                providers.sort((a, b) => a.isMetaMask ? -1 : b.isMetaMask ? 1 : 0);
-                providers.forEach((p) => {
-                    const walletName = getWalletName(p);
-                    const btn = document.createElement('button');
-                    btn.textContent = walletName;
-                    // Button calls connectWallet(p)
-                    btn.addEventListener('click', async () => { hideWalletPopup(); await connectWallet(p); });
-                    popup.appendChild(btn);
-                });
+                
                 overlay.style.display = 'block';
                 popup.style.display = 'block';
             }

@@ -1477,6 +1477,257 @@
                 totalPriceEl.textContent = ticketCount * ticketPrice;
             }
 
+            // ===== WALLET CONNECTION FUNCTIONS =====
+
+            /**
+             * Détecte tous les wallets disponibles
+             */
+            function detectAllWallets() {
+                const wallets = [];
+                
+                // MetaMask
+                if (window.ethereum && window.ethereum.isMetaMask) {
+                    wallets.push({
+                        name: "MetaMask",
+                        provider: window.ethereum,
+                        type: "metamask",
+                        installUrl: "https://metamask.io/download/"
+                    });
+                }
+                
+                // Coinbase Wallet
+                if (window.ethereum && window.ethereum.isCoinbaseWallet) {
+                    wallets.push({
+                        name: "Coinbase Wallet", 
+                        provider: window.ethereum,
+                        type: "coinbase",
+                        installUrl: "https://www.coinbase.com/wallet/downloads"
+                    });
+                }
+                
+                // Rabby Wallet
+                if (window.ethereum && window.ethereum.isRabby) {
+                    wallets.push({
+                        name: "Rabby Wallet",
+                        provider: window.ethereum, 
+                        type: "rabby",
+                        installUrl: "https://rabby.io/"
+                    });
+                }
+                
+                // Trust Wallet
+                if (window.ethereum && window.ethereum.isTrust) {
+                    wallets.push({
+                        name: "Trust Wallet",
+                        provider: window.ethereum,
+                        type: "trust", 
+                        installUrl: "https://trustwallet.com/download"
+                    });
+                }
+                
+                // Phantom
+                if (window.ethereum && window.ethereum.isPhantom) {
+                    wallets.push({
+                        name: "Phantom",
+                        provider: window.ethereum,
+                        type: "phantom",
+                        installUrl: "https://phantom.app/download"
+                    });
+                }
+                
+                // Brave Wallet
+                if (window.ethereum && window.ethereum.isBraveWallet) {
+                    wallets.push({
+                        name: "Brave Wallet",
+                        provider: window.ethereum,
+                        type: "brave",
+                        installUrl: "https://brave.com/wallet/"
+                    });
+                }
+                
+                // WalletConnect (toujours disponible)
+                wallets.push({
+                    name: "WalletConnect",
+                    provider: null,
+                    type: "walletconnect",
+                    installUrl: "https://walletconnect.com/"
+                });
+                
+                // Si aucun wallet spécifique détecté mais window.ethereum existe
+                if (window.ethereum && wallets.length === 1) { // seulement WalletConnect
+                    wallets.unshift({
+                        name: "Ethereum Wallet",
+                        provider: window.ethereum,
+                        type: "generic",
+                        installUrl: "https://ethereum.org/en/wallets/find-wallet/"
+                    });
+                }
+                
+                return wallets;
+            }
+
+            /**
+             * Tente de connecter un wallet
+             */
+            async function connectToWallet(wallet) {
+                if (wallet.type === "walletconnect") {
+                    showError("WalletConnect integration à implémenter");
+                    return;
+                }
+                
+                if (!wallet.provider) {
+                    // Wallet non installé - rediriger vers la page de téléchargement
+                    window.open(wallet.installUrl, '_blank');
+                    return;
+                }
+                
+                try {
+                    showLoading(`Connecting to ${wallet.name}...`);
+                    const accounts = await wallet.provider.request({ 
+                        method: 'eth_requestAccounts' 
+                    });
+                    
+                    isDisconnected = false;
+                    localStorage.setItem("walletDisconnected", "false");
+                    await updateButton(accounts);
+                    hideLoading();
+                    
+                } catch (error) {
+                    hideLoading();
+                    console.error(`Connection to ${wallet.name} failed:`, error);
+                    
+                    if (error.code === 4001) {
+                        showError("Connection rejected by user");
+                    } else if (error.code === -32002) {
+                        showError("Request already pending. Check your wallet.");
+                    } else {
+                        showError(`Failed to connect to ${wallet.name}`);
+                    }
+                }
+            }
+
+            /**
+             * Shows the wallet selection popup - VERSION CORRIGÉE
+             */
+            function showWalletPopup() {
+                popup.innerHTML = '';
+                
+                // Détecter tous les wallets
+                const availableWallets = detectAllWallets();
+                
+                if (availableWallets.length > 0) {
+                    // Afficher tous les wallets détectés
+                    availableWallets.forEach(wallet => {
+                        const btn = document.createElement('button');
+                        btn.textContent = wallet.name;
+                        
+                        // Vérifier si le wallet est installé
+                        const isInstalled = wallet.provider !== null && wallet.provider !== undefined;
+                        
+                        if (!isInstalled) {
+                            btn.innerHTML += ' <span style="font-size:0.8em; opacity:0.7;">(Not installed)</span>';
+                        }
+                        
+                        btn.addEventListener('click', async () => { 
+                            hideWalletPopup(); 
+                            await connectToWallet(wallet);
+                        });
+                        
+                        popup.appendChild(btn);
+                    });
+                } else {
+                    // Aucun wallet détecté - afficher les options d'installation
+                    const walletsToInstall = [
+                        { name: "MetaMask", url: "https://metamask.io/download/" },
+                        { name: "Coinbase Wallet", url: "https://www.coinbase.com/wallet/downloads" },
+                        { name: "Rabby Wallet", url: "https://rabby.io/" },
+                        { name: "Trust Wallet", url: "https://trustwallet.com/download" },
+                        { name: "Phantom", url: "https://phantom.app/download" },
+                        { name: "Brave Wallet", url: "https://brave.com/wallet/" }
+                    ];
+                    
+                    walletsToInstall.forEach(wallet => {
+                        const btn = document.createElement('button');
+                        btn.textContent = `Install ${wallet.name}`;
+                        btn.addEventListener('click', () => {
+                            window.open(wallet.url, '_blank');
+                        });
+                        popup.appendChild(btn);
+                    });
+                }
+                
+                overlay.style.display = 'block';
+                popup.style.display = 'block';
+            }
+
+            /**
+             * Hides the wallet popup
+             */
+            function hideWalletPopup() { 
+                popup.style.display = 'none'; 
+                overlay.style.display = 'none'; 
+            }
+
+            /**
+             * Gets available EVM providers
+             */
+            function getEVMProviders() {
+                if (!window.ethereum) return [];
+                if (window.ethereum.providers && window.ethereum.providers.length > 0) return window.ethereum.providers;
+                return [window.ethereum];
+            }
+
+            function getWalletName(p) { 
+                if (p.isRabby) return "Rabby Wallet";
+                if (p.isTrust) return "Trust Wallet"; 
+                if (p.isCoinbaseWallet) return "Coinbase Wallet";
+                if (p.isBraveWallet) return "Brave Wallet";
+                if (p.isPhantom) return "Phantom";
+                if (p.isMetaMask) return "MetaMask"; 
+                if (p.name) return p.name;
+                return "EVM Wallet";
+            }
+
+            /**
+             * Updates the connect button based on connection status
+             */
+            async function updateButton(accounts) {
+                if (isDisconnected) accounts = [];
+                const account = accounts.length > 0 ? accounts[0] : null;
+
+                lastAccount = account;
+                if (balanceInterval) { clearInterval(balanceInterval); balanceInterval = null; }
+
+                ticketInput.value = 0;
+                updateTotalPrice();
+                
+                if (account) {
+                    button.textContent = `Connected: ${account.substring(0, 6)}...${account.slice(-4)}`;
+                    button.classList.add('connected');
+                    await updateBalance(account);
+                    balanceInterval = setInterval(() => updateBalance(account), 10000);
+                    ticketInput.oninput = () => {
+                        let maxTicketsAllowed = parseInt(maxTicketsEl.textContent.toString());
+                        let currentValue = parseInt(ticketInput.value);
+                        if (isNaN(currentValue)) currentValue = 0;
+                        if (!isNaN(maxTicketsAllowed) && currentValue > maxTicketsAllowed) ticketInput.value = maxTicketsAllowed;
+                        else if (currentValue < 0) ticketInput.value = 0;
+                        updateTotalPrice();
+                    };
+                } else {
+                    button.textContent = 'Connect your wallet';
+                    button.classList.remove('connected');
+                    await updateBalance(null);
+                    ticketInput.oninput = () => {
+                        let val = parseInt(ticketInput.value);
+                        if (isNaN(val) || val < 0) val = 0;
+                        if (val > 7) val = 7;
+                        ticketInput.value = val;
+                        updateTotalPrice();
+                    };
+                }
+            }
+
             // ===== DATA FETCHING FUNCTIONS =====
 
             /**
@@ -1799,244 +2050,6 @@
                 } catch (err) {
                     console.error("updateBalance failed:", err);
                 }
-            }
-
-            // ===== WALLET CONNECTION FUNCTIONS =====
-
-            /**
-             * Gets available EVM providers
-             */
-            function getEVMProviders() {
-                if (!window.ethereum) return [];
-                if (window.ethereum.providers && window.ethereum.providers.length > 0) return window.ethereum.providers;
-                return [window.ethereum];
-            }
-
-            function getWalletName(p) { 
-                if (p.isRabby) return "Rabby Wallet";
-                if (p.isTrust) return "Trust Wallet"; 
-                if (p.isCoinbaseWallet) return "Coinbase Wallet";
-                if (p.isBraveWallet) return "Brave Wallet";
-                if (p.isPhantom) return "Phantom";
-                if (p.isMetaMask) return "MetaMask"; 
-                if (p.name) return p.name;
-                return "EVM Wallet";
-            }
-
-            /**
-             * Updates the connect button based on connection status
-             */
-            async function updateButton(accounts) {
-                if (isDisconnected) accounts = [];
-                const account = accounts.length > 0 ? accounts[0] : null;
-
-                lastAccount = account;
-                if (balanceInterval) { clearInterval(balanceInterval); balanceInterval = null; }
-
-                ticketInput.value = 0;
-                updateTotalPrice();
-                
-                if (account) {
-                    button.textContent = `Connected: ${account.substring(0, 6)}...${account.slice(-4)}`;
-                    button.classList.add('connected');
-                    await updateBalance(account);
-                    balanceInterval = setInterval(() => updateBalance(account), 10000);
-                    ticketInput.oninput = () => {
-                        let maxTicketsAllowed = parseInt(maxTicketsEl.textContent.toString());
-                        let currentValue = parseInt(ticketInput.value);
-                        if (isNaN(currentValue)) currentValue = 0;
-                        if (!isNaN(maxTicketsAllowed) && currentValue > maxTicketsAllowed) ticketInput.value = maxTicketsAllowed;
-                        else if (currentValue < 0) ticketInput.value = 0;
-                        updateTotalPrice();
-                    };
-                } else {
-                    button.textContent = 'Connect your wallet';
-                    button.classList.remove('connected');
-                    await updateBalance(null);
-                    ticketInput.oninput = () => {
-                        let val = parseInt(ticketInput.value);
-                        if (isNaN(val) || val < 0) val = 0;
-                        if (val > 7) val = 7;
-                        ticketInput.value = val;
-                        updateTotalPrice();
-                    };
-                }
-            }
-
-            /**
-             * Connects to a wallet provider
-             */
-            async function connectWallet(provider) {
-                let finalError = null;
-
-                // Function to attempt connection
-                const attemptConnection = async (p) => {
-                    try {
-                        const accounts = await p.request({ method: 'eth_requestAccounts' });
-                        isDisconnected = false;
-                        localStorage.setItem("walletDisconnected", "false");
-                        await updateButton(accounts);
-                        return true; // Connection successful
-                    } catch (err) {
-                        finalError = err;
-                        return false; // Connection failed
-                    }
-                };
-
-                // 1. First attempt
-                if (await attemptConnection(provider)) {
-                    return;
-                }
-
-                // 2. If first attempt failed with instability error (-32603), retry once after a short delay
-                if (finalError && finalError.code === -32603) {
-                    console.warn("Wallet instability detected. Retrying once after 100ms...");
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    
-                    if (await attemptConnection(provider)) {
-                        return;
-                    }
-                }
-                
-                // 3. Display final error after all attempts failed
-                if (finalError) {
-                    console.error("Wallet connection failed details:", finalError);
-                    let errorMessage = "Wallet connection failed";
-
-                    if (finalError.code === 4001) {
-                        errorMessage = "Connection rejected by user.";
-                    } else if (finalError.code === -32002) {
-                        errorMessage = "Pending request. Please check your wallet's extension/pop-up.";
-                    } else if (finalError.code === -32603) {
-                        // After retry failure
-                        errorMessage = "Wallet not ready. Please unlock your extension and try again.";
-                    } else if (finalError.message) {
-                        errorMessage = finalError.message.substring(0, 100);
-                    }
-
-                    showError(errorMessage);
-                }
-            }
-
-            /**
-             * Détecte les wallets mobiles disponibles
-             */
-            function detectMobileWallets() {
-                const wallets = [];
-                
-                // Détection basée sur userAgent et APIs disponibles
-                if (window.ethereum) {
-                    // Si window.ethereum existe déjà, on l'utilise
-                    wallets.push({
-                        name: "Browser Wallet",
-                        provider: window.ethereum,
-                        type: "injected"
-                    });
-                }
-                
-                // Détection pour Coinbase Wallet
-                if (window.coinbaseWalletExtension) {
-                    wallets.push({
-                        name: "Coinbase Wallet",
-                        provider: window.coinbaseWalletExtension,
-                        type: "coinbase"
-                    });
-                }
-                
-                // Détection pour Rabby Wallet
-                if (window.rabby && window.rabby.ethereum) {
-                    wallets.push({
-                        name: "Rabby Wallet", 
-                        provider: window.rabby.ethereum,
-                        type: "rabby"
-                    });
-                }
-                
-                // Détection pour Trust Wallet
-                if (window.trustwallet) {
-                    wallets.push({
-                        name: "Trust Wallet",
-                        provider: window.trustwallet,
-                        type: "trust"
-                    });
-                }
-                
-                // Détection générique pour autres wallets
-                if (window.ethereum && !wallets.some(w => w.type === "injected")) {
-                    wallets.push({
-                        name: "Ethereum Wallet",
-                        provider: window.ethereum,
-                        type: "generic"
-                    });
-                }
-                
-                return wallets;
-            }
-
-            /**
-             * Shows the wallet selection popup - CORRIGÉ POUR MOBILE
-             */
-            function showWalletPopup() {
-                popup.innerHTML = '';
-                
-                // D'abord essayer de détecter les wallets disponibles
-                const availableWallets = detectMobileWallets();
-                
-                if (availableWallets.length > 0) {
-                    // Afficher les wallets détectés
-                    availableWallets.forEach(wallet => {
-                        const btn = document.createElement('button');
-                        btn.textContent = wallet.name;
-                        btn.addEventListener('click', async () => { 
-                            hideWalletPopup(); 
-                            await connectWallet(wallet.provider);
-                        });
-                        popup.appendChild(btn);
-                    });
-                } else {
-                    // Si aucun wallet détecté, utiliser l'approche standard
-                    let providers = getEVMProviders(); 
-                    
-                    // If no provider is detected
-                    if (providers.length === 0) { 
-                        const btn = document.createElement('button');
-                        btn.textContent = "No wallet detected";
-                        btn.disabled = true;
-                        popup.appendChild(btn);
-                        
-                        // Option pour installer MetaMask
-                        const installBtn = document.createElement('button');
-                        installBtn.textContent = "Install MetaMask";
-                        installBtn.addEventListener('click', () => {
-                            window.open('https://metamask.io/download/', '_blank');
-                        });
-                        popup.appendChild(installBtn);
-                    } else {
-                        // Display all found providers, sorting to put MetaMask first
-                        providers.sort((a, b) => a.isMetaMask ? -1 : b.isMetaMask ? 1 : 0);
-                        providers.forEach((p) => {
-                            const walletName = getWalletName(p);
-                            const btn = document.createElement('button');
-                            btn.textContent = walletName;
-                            btn.addEventListener('click', async () => { 
-                                hideWalletPopup(); 
-                                await connectWallet(p); 
-                            });
-                            popup.appendChild(btn);
-                        });
-                    }
-                }
-                
-                overlay.style.display = 'block';
-                popup.style.display = 'block';
-            }
-
-            /**
-             * Hides the wallet popup
-             */
-            function hideWalletPopup() { 
-                popup.style.display = 'none'; 
-                overlay.style.display = 'none'; 
             }
 
             // ===== COUNTDOWN FUNCTION =====

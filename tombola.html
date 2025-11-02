@@ -1974,7 +1974,7 @@ async function connectWithWalletConnect() {
         
         // Initialiser WalletConnect V2
         walletConnectProvider = await EthereumProvider.init({
-            projectId: "votre-project-id", // Obtenez-le sur walletconnect.com
+            projectId: "4c7776eeb4ace1f4484fb171741724ba", // Obtenez-le sur walletconnect.com
             chains: [84532], // Base Sepolia
             methods: ["eth_sendTransaction", "eth_signTransaction", "personal_sign"],
             events: ["chainChanged", "accountsChanged"],
@@ -2378,21 +2378,44 @@ async function updateWalletConnectUI(account) {
                     
                     if (drawStatus.status === 'en_cours') {
                         showError("A draw is in progress. Ticket purchases are temporarily disabled.");
-                        return; // Exit the function immediately
+                        return;
                     }
                 } catch (err) {
                     console.error("Failed to check draw status:", err);
                     showError("Server is down. Please try later.");
-                    return; // Exit the function if there's an API error
+                    return;
                 }
-                if (!lastAccount) { showError("Connect your wallet first"); return; }
+                
+                if (!lastAccount) { 
+                    showError("Connect your wallet first"); 
+                    return; 
+                }
+                
                 const amount = parseInt(ticketInput.value);
-                if(isNaN(amount) || amount <= 0) { showError("Enter a valid number of tickets"); return; }
+                if(isNaN(amount) || amount <= 0) { 
+                    showError("Enter a valid number of tickets"); 
+                    return; 
+                }
 
                 buyButton.disabled = true;
                 try {
-                    const provider = new ethers.BrowserProvider(window.ethereum);
-                    const signer = await provider.getSigner();
+                    let signer;
+                    let provider;
+                    
+                    // Utiliser WalletConnect si connecté
+                    if (walletConnectProvider && lastAccount) {
+                        provider = new ethers.BrowserProvider(walletConnectProvider);
+                        signer = await provider.getSigner();
+                    } 
+                    // Utiliser le provider normal (MetaMask desktop)
+                    else if (window.ethereum) {
+                        provider = new ethers.BrowserProvider(window.ethereum);
+                        signer = await provider.getSigner();
+                    } else {
+                        showError("No wallet connected");
+                        return;
+                    }
+
                     const ticketSaleContract = new ethers.Contract(TICKET_SALE_ADDRESS, TICKET_SALE_ABI, signer);
                     const inkyContractWithSigner = new ethers.Contract(INKY_ADDRESS, INKY_ABI, signer);
 
@@ -2422,7 +2445,7 @@ async function updateWalletConnectUI(account) {
                     await Promise.all([
                         updateBalance(accountAddress),
                         updateStats(roundId),
-                        updateParticipantsTable(roundId, currentPage) // Conserver la page actuelle
+                        updateParticipantsTable(roundId, currentPage)
                     ]);
 
                 } catch(err) {

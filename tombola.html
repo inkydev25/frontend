@@ -1359,6 +1359,7 @@
 
     <!-- External libraries -->
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+    <script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
 
     <!-- Main application script -->
     <script>
@@ -1930,38 +1931,26 @@
                 const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
                 
                 if (isMobile) {
-                    // Deep links pour tous les wallets mobiles
-                    const currentUrl = window.location.href;
-                    
-                    const wallets = [
-                        { name: "MetaMask", deepLink: `https://metamask.app.link/dapp/${window.location.hostname}${window.location.pathname}` },
-                        { name: "Trust Wallet", deepLink: `https://link.trustwallet.com/dapp/${window.location.hostname}${window.location.pathname}` },
-                        { name: "Coinbase Wallet", deepLink: `https://go.cb-w.com/dapp?url=${encodeURIComponent(currentUrl)}` },
-                        { name: "Rabby Wallet", deepLink: `https://rabby.io/dapp?url=${encodeURIComponent(currentUrl)}` }
-                    ];
-                    
-                    wallets.forEach(wallet => {
-                        const btn = document.createElement('button');
-                        btn.textContent = `Open in ${wallet.name}`;
-                        btn.addEventListener('click', () => {
-                            window.location.href = wallet.deepLink;
-                        });
-                        popup.appendChild(btn);
+                    // Solution WalletConnect simple
+                    const wcBtn = document.createElement('button');
+                    wcBtn.textContent = "Scan QR Code with Wallet";
+                    wcBtn.addEventListener('click', () => {
+                        initSimpleWalletConnect();
                     });
+                    popup.appendChild(wcBtn);
                     
                     overlay.style.display = 'block';
                     popup.style.display = 'block';
                     return;
                 }
                 
-                // CODE PC - Afficher la liste des wallets détectés
+                // Code PC normal...
                 let providers = getEVMProviders();
                 if (providers.length === 0) { 
                     showError("No EVM wallet detected!"); 
                     return; 
                 }
                 
-                // Afficher chaque wallet avec son nom
                 providers.forEach((p) => {
                     const walletName = getWalletName(p);
                     const btn = document.createElement('button');
@@ -1975,6 +1964,37 @@
                 
                 overlay.style.display = 'block';
                 popup.style.display = 'block';
+            }
+
+            async function initSimpleWalletConnect() {
+                try {
+                    showLoading("🔄 Generating QR Code...");
+                    
+                    const provider = new WalletConnectProvider.default({
+                        rpc: {
+                            84532: "https://sepolia.base.org" // Votre RPC
+                        }
+                    });
+
+                    await provider.enable();
+                    
+                    const accounts = await provider.request({ method: "eth_accounts" });
+                    
+                    hideWalletPopup();
+                    hideLoading();
+
+                    if (accounts.length > 0) {
+                        // Connecté avec succès !
+                        button.textContent = `WC: ${accounts[0].substring(0, 6)}...${accounts[0].slice(-4)}`;
+                        button.classList.add('connected');
+                        lastAccount = accounts[0];
+                        await updateBalance(accounts[0]);
+                    }
+
+                } catch (error) {
+                    hideLoading();
+                    console.error("WalletConnect error:", error);
+                }
             }
 
             /**

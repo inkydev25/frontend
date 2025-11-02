@@ -1925,46 +1925,99 @@
             /**
              * Shows the wallet selection popup
              */
-            function showWalletPopup() {
-                popup.innerHTML = '';
-                
-                const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-                
-                if (isMobile) {
-                    // Solution WalletConnect simple
-                    const wcBtn = document.createElement('button');
-                    wcBtn.textContent = "Scan QR Code with Wallet";
-                    wcBtn.addEventListener('click', () => {
-                        initSimpleWalletConnect();
-                    });
-                    popup.appendChild(wcBtn);
-                    
-                    overlay.style.display = 'block';
-                    popup.style.display = 'block';
-                    return;
-                }
-                
-                // Code PC normal...
-                let providers = getEVMProviders();
-                if (providers.length === 0) { 
-                    showError("No EVM wallet detected!"); 
-                    return; 
-                }
-                
-                providers.forEach((p) => {
-                    const walletName = getWalletName(p);
-                    const btn = document.createElement('button');
-                    btn.textContent = walletName;
-                    btn.addEventListener('click', async () => { 
-                        hideWalletPopup(); 
-                        await connectWallet(p); 
-                    });
-                    popup.appendChild(btn);
-                });
-                
-                overlay.style.display = 'block';
-                popup.style.display = 'block';
-            }
+async function showWalletPopup() {
+    popup.innerHTML = '';
+    
+    const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+        // WalletConnect V2 comme launch.nukl.ai
+        const wcBtn = document.createElement('button');
+        wcBtn.textContent = "Connect Wallet";
+        wcBtn.addEventListener('click', async () => {
+            await connectWithWalletConnect();
+        });
+        popup.appendChild(wcBtn);
+        
+        overlay.style.display = 'block';
+        popup.style.display = 'block';
+        return;
+    }
+    
+    // Code PC normal...
+    let providers = getEVMProviders();
+    if (providers.length === 0) { 
+        showError("No EVM wallet detected!"); 
+        return; 
+    }
+    
+    providers.forEach((p) => {
+        const walletName = getWalletName(p);
+        const btn = document.createElement('button');
+        btn.textContent = walletName;
+        btn.addEventListener('click', async () => { 
+            hideWalletPopup(); 
+            await connectWallet(p); 
+        });
+        popup.appendChild(btn);
+    });
+    
+    overlay.style.display = 'block';
+    popup.style.display = 'block';
+}
+
+let walletConnectProvider = null;
+
+async function connectWithWalletConnect() {
+    try {
+        showLoading("🔄 Connecting...");
+        
+        // Initialiser WalletConnect V2
+        walletConnectProvider = await EthereumProvider.init({
+            projectId: "votre-project-id", // Obtenez-le sur walletconnect.com
+            chains: [84532], // Base Sepolia
+            methods: ["eth_sendTransaction", "eth_signTransaction", "personal_sign"],
+            events: ["chainChanged", "accountsChanged"],
+            showQrModal: true
+        });
+
+        // Activer la connexion
+        await walletConnectProvider.connect();
+        
+        // Récupérer les comptes
+        const accounts = walletConnectProvider.accounts;
+        
+        hideWalletPopup();
+        hideLoading();
+
+        if (accounts.length > 0) {
+            // Mettre à jour l'interface
+            await updateWalletConnectUI(accounts[0]);
+        }
+
+    } catch (error) {
+        hideLoading();
+        console.error("WalletConnect error:", error);
+        if (error.message !== "User rejected connection") {
+            showError("Connection failed");
+        }
+    }
+}
+
+async function updateWalletConnectUI(account) {
+    button.textContent = `WC: ${account.substring(0, 6)}...${account.slice(-4)}`;
+    button.classList.add('connected');
+    lastAccount = account;
+    await updateBalance(account);
+    
+    // Écouter les déconnexions
+    walletConnectProvider.on("disconnect", () => {
+        button.textContent = "Connect your wallet";
+        button.classList.remove('connected');
+        lastAccount = null;
+        updateBalance(null);
+    });
+}
 
             async function initSimpleWalletConnect() {
                 try {

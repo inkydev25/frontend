@@ -1803,20 +1803,12 @@
             }
 
             // ===== WALLET CONNECTION FUNCTIONS =====
+
             function getEVMProviders() {
-                const providers = [];
-                
-                // MetaMask et tous les wallets compatibles EIP-1193
                 if (window.ethereum) {
-                    providers.push(window.ethereum);
+                    return [window.ethereum];
                 }
-                
-                // Anciens wallets (web3 legacy)
-                if (window.web3 && window.web3.currentProvider) {
-                    providers.push(window.web3.currentProvider);
-                }
-                
-                return providers;
+                return [];
             }
 
             function getWalletName(p) { 
@@ -1930,24 +1922,43 @@
              */
             function showWalletPopup() {
                 popup.innerHTML = '';
-                let providers = getEVMProviders(); 
                 
-                // If no provider is detected
+                const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+                
+                if (isMobile) {
+                    // Créer le deep link pour MetaMask
+                    const currentUrl = encodeURIComponent(window.location.href);
+                    const metamaskDeepLink = `https://metamask.app.link/dapp/${window.location.hostname}${window.location.pathname}`;
+                    
+                    const mmBtn = document.createElement('button');
+                    mmBtn.textContent = "Open in MetaMask";
+                    mmBtn.addEventListener('click', () => {
+                        window.location.href = metamaskDeepLink;
+                    });
+                    popup.appendChild(mmBtn);
+                    
+                    overlay.style.display = 'block';
+                    popup.style.display = 'block';
+                    return;
+                }
+                
+                // Code desktop normal...
+                let providers = getEVMProviders();
                 if (providers.length === 0) { 
-                    showError("No EVM-compatible wallet detected!"); 
+                    showError("No wallet detected!"); 
                     return; 
                 }
-
-                // Display all found providers, sorting to put MetaMask first
-                providers.sort((a, b) => a.isMetaMask ? -1 : b.isMetaMask ? 1 : 0);
+                
                 providers.forEach((p) => {
-                    const walletName = getWalletName(p);
                     const btn = document.createElement('button');
-                    btn.textContent = walletName;
-                    // Button calls connectWallet(p)
-                    btn.addEventListener('click', async () => { hideWalletPopup(); await connectWallet(p); });
+                    btn.textContent = "Connect Wallet";
+                    btn.addEventListener('click', async () => { 
+                        hideWalletPopup(); 
+                        await connectWallet(p); 
+                    });
                     popup.appendChild(btn);
                 });
+                
                 overlay.style.display = 'block';
                 popup.style.display = 'block';
             }

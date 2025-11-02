@@ -1358,8 +1358,7 @@
     <img src="inky-logo.png" class="floating-logo" style="top:70%;left:6%; animation-delay:8s;">
 
     <!-- External libraries -->
-<script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
     <!-- Main application script -->
     <script>
         // ===== APPLICATION INITIALIZATION =====
@@ -1920,16 +1919,44 @@
             }
 
             /**
-             * Shows the wallet selection popup
+             * Shows the wallet selection popup - MODIFIÉ POUR MOBILE
              */
             function showWalletPopup() {
                 popup.innerHTML = '';
                 let providers = getEVMProviders(); 
                 
-                // If no provider is detected
+                // If no provider is detected, show mobile wallet options
                 if (providers.length === 0) { 
-                    showError("No EVM-compatible wallet detected!"); 
-                    return; 
+                    // Options pour mobile
+                    const mobileWallets = [
+                        { name: "MetaMask Mobile", id: "metamask", url: "https://metamask.app.link/dapp/" + window.location.hostname },
+                        { name: "Trust Wallet", id: "trust", url: "https://link.trustwallet.com/dapp/" + window.location.hostname },
+                        { name: "Coinbase Wallet", id: "coinbase", url: "https://go.cb-w.com/dapp?url=" + window.location.href },
+                        { name: "Rabby Wallet", id: "rabby", url: "https://rabby.io/" },
+                        { name: "WalletConnect", id: "walletconnect", url: "#", action: "walletconnect" }
+                    ];
+
+                    mobileWallets.forEach(wallet => {
+                        const btn = document.createElement('button');
+                        btn.textContent = wallet.name;
+                        btn.dataset.walletId = wallet.id;
+                        
+                        if (wallet.action === "walletconnect") {
+                            btn.addEventListener('click', () => {
+                                showError("WalletConnect integration à implémenter");
+                            });
+                        } else {
+                            btn.addEventListener('click', () => {
+                                window.open(wallet.url, '_blank');
+                            });
+                        }
+                        
+                        popup.appendChild(btn);
+                    });
+                    
+                    overlay.style.display = 'block';
+                    popup.style.display = 'block';
+                    return;
                 }
 
                 // Display all found providers, sorting to put MetaMask first
@@ -2267,82 +2294,70 @@
             /**
              * Handles ticket purchase
              */
-            async function buyTickets() {
-                if (!lastAccount) { 
-                    showError("Please connect your wallet first."); 
-                    return; 
-                }
-
-                const ticketCount = parseInt(ticketInput.value);
-                if (isNaN(ticketCount) || ticketCount <= 0) { 
-                    showError("Please enter a valid number of tickets."); 
-                    return; 
-                }
-
-                const maxTicketsAllowed = parseInt(maxTicketsEl.textContent);
-                if (ticketCount > maxTicketsAllowed) { 
-                    showError(`You can only buy up to ${maxTicketsAllowed} tickets.`); 
-                    return; 
-                }
-
-                const totalPrice = ticketCount * ticketPrice;
-                const inkyBalance = parseInt(document.getElementById("inkyBalance").textContent.replace(/,/g, ''));
-
-                if (inkyBalance < totalPrice) { 
-                    showError("Insufficient INKY balance."); 
-                    return; 
-                }
-
-                // Check allowance
-                const provider = new ethers.BrowserProvider(window.ethereum);
-                const signer = await provider.getSigner();
-                const inkyContractWithSigner = inkyContract.connect(signer);
-                const currentAllowance = await inkyContractWithSigner.allowance(lastAccount, TICKET_SALE_ADDRESS);
-
-                if (currentAllowance < totalPrice) {
-                    try {
-                        showLoading("Approving INKY tokens...");
-                        const approveTx = await inkyContractWithSigner.approve(TICKET_SALE_ADDRESS, ethers.MaxUint256);
-                        await approveTx.wait();
-                        hideLoading();
-                    } catch (err) {
-                        hideLoading();
-                        console.error("Approval failed:", err);
-                        showError("Token approval failed.");
-                        return;
-                    }
-                }
-
+            buyButton.addEventListener('click', async () => {
                 try {
-                    showLoading("Buying tickets...");
-                    const ticketSaleContract = new ethers.Contract(TICKET_SALE_ADDRESS, TICKET_SALE_ABI, signer);
-                    const tx = await ticketSaleContract.buyTickets(ticketCount);
-                    await tx.wait();
-                    hideLoading();
+                    const drawStatusResponse = await fetch('http://localhost:3000/api/draw-status');
+                    const drawStatus = await drawStatusResponse.json();
                     
-                    // Update UI
-                    await updateBalance(lastAccount);
-                    await updateStats(roundId);
-                    await updateParticipantsTable(roundId, currentPage);
-                    
-                    showError(`Successfully purchased ${ticketCount} ticket(s)!`, 3000);
-                    ticketInput.value = 0;
-                    updateTotalPrice();
-                    
+                    if (drawStatus.status === 'en_cours') {
+                        showError("A draw is in progress. Ticket purchases are temporarily disabled.");
+                        return; // Exit the function immediately
+                    }
                 } catch (err) {
-                    hideLoading();
-                    console.error("Purchase failed:", err);
-                    showError("Transaction failed.");
+                    console.error("Failed to check draw status:", err);
+                    showError("Server is down. Please try later.");
+                    return; // Exit the function if there's an API error
                 }
-            }
+                if (!lastAccount) { showError("Connect your wallet first"); return; }
+                const amount = parseInt(ticketInput.value);
+                if(isNaN(amount) || amount <= 0) { showError("Enter a valid number of tickets"); return; }
 
-            // ===== EVENT LISTENERS =====
+                buyButton.disabled = true;
+                try {
+                    const provider = new ethers.BrowserProvider(window.ethereum);
+                    const signer = await provider.getSigner();
+                    const ticketSaleContract = new ethers.Contract(TICKET_SALE_ADDRESS, TICKET_SALE_ABI, signer);
+                    const inkyContractWithSigner = new ethers.Contract(INKY_ADDRESS, INKY_ABI, signer);
 
-            button.addEventListener('click', showWalletPopup);
-            overlay.addEventListener('click', hideWalletPopup);
-            buyButton.addEventListener('click', buyTickets);
+                    const decimals = await safeCall(inkyContractWithSigner.decimals(), 18);
+                    const totalCostRaw = ethers.parseUnits((ticketPrice * amount).toString(), decimals);
 
-            // Pagination event listeners
+                    const accountAddress = await safeCall(signer.getAddress(), null);
+                    if (!accountAddress) throw new Error("Cannot get wallet address");
+
+                    const allowance = await safeCall(inkyContractWithSigner.allowance(accountAddress, ticketSaleContract.target), 0);
+                    if (allowance < totalCostRaw) {
+                        showLoading("⏳ Waiting for approval...");
+                        const approveTx = await safeCall(inkyContractWithSigner.approve(ticketSaleContract.target, totalCostRaw));
+                        if(!approveTx) throw new Error("Approval failed or rejected");
+                        await safeCall(approveTx.wait());
+                        hideLoading();
+                    }
+
+                    showLoading("⏳ Waiting for ticket purchase...");
+                    const tx = await safeCall(ticketSaleContract.buyTickets(amount));
+                    if(!tx) throw new Error("Purchase failed or rejected");
+                    await safeCall(tx.wait());
+                    showLoading('✅ Purchase successful! <img src="inky-logo.png" style="width:74px; vertical-align:middle; margin-left:6px;">');
+                    setTimeout(() => { hideLoading(); }, 3000);
+
+                    const roundId = await safeCall(ticketSaleRead.currentRoundId(), 1);
+                    await Promise.all([
+                        updateBalance(accountAddress),
+                        updateStats(roundId),
+                        updateParticipantsTable(roundId, currentPage) // Conserver la page actuelle
+                    ]);
+
+                } catch(err) {
+                    hideLoading();
+                    console.error("Transaction error:", err);
+                    showError("Transaction failed: " + (err?.message || err));
+                } finally {
+                    buyButton.disabled = false;
+                }
+            });
+
+            // ===== PAGINATION EVENT LISTENERS =====
             document.getElementById('prevPage').addEventListener('click', () => {
                 if (currentPage > 1) {
                     currentPage--;
@@ -2358,56 +2373,101 @@
                 }
             });
 
-            // ===== INITIALIZATION =====
+            // ===== INITIALIZATION FUNCTIONS =====
 
-            // Initialize the application
-            async function init() {
-                try {
-                    // Initial data loading
-                    await fetchWinner();
-                    
-                    // Get current round and update stats
-                    const currentRoundId = await safeCall(ticketSaleRead.currentRoundId(), 1);
-                    await updateStats(currentRoundId);
-                    
-                    // Update all components
-                    await updateParticipantsTable(currentRoundId, currentPage);
-                    await updateWinnersTable();
-                    await updateCountdown();
-                    await setupEvolutionChart();
-                    
-                    // Set up intervals
-                    setInterval(updateCountdown, 1000);
-                    setInterval(async () => {
-                        await updateStats(roundId);
-                        await updateParticipantsTable(roundId, currentPage);
-                    }, 30000);
-                    
-                    // Handle wallet connection
-                    if (window.ethereum) {
-                        window.ethereum.on('accountsChanged', (accounts) => updateButton(accounts));
-                        window.ethereum.on('chainChanged', () => window.location.reload());
-                        
-                        try {
-                            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-                            await updateButton(accounts);
-                        } catch (err) {
-                            console.error("Error fetching initial accounts:", err);
+            /**
+             * Initializes all data
+             */
+            async function initializeData() {
+                const fetchedRoundId = await safeCall(ticketSaleRead.currentRoundId(), 1);
+                roundId = fetchedRoundId;
+                
+                // Charger les stats d'abord pour avoir le totalParticipantsCount
+                await updateStats(roundId);
+                
+                // Ensuite charger la table des participants avec la pagination
+                await updateParticipantsTable(roundId, currentPage);
+                
+                await Promise.all([
+                    updateWinnersTable(),
+                    fetchWinner(),
+                    setupEvolutionChart() 
+                ]);
+                
+                const providers = getEVMProviders();
+                providers.forEach(p => { if (p && p.on) p.on('accountsChanged', updateButton); });
+
+                if (!isDisconnected) {
+                    for (const p of providers) {
+                        if (p) {
+                            const accounts = await safeCall(p.request({ method: 'eth_accounts' }), []);
+                            if (accounts.length > 0) {
+                                await updateButton(accounts);
+                                break;
+                            }
                         }
                     }
-                    
-                    // Align containers after all content is loaded
-                    setTimeout(alignContainerHeights, 100);
-                    window.addEventListener('resize', alignContainerHeights);
-                    
-                } catch (error) {
-                    console.error("Initialization error:", error);
+                } else {
+                    await updateButton([]);
                 }
             }
 
-            // Start the application
-            init();
+            /**
+             * Starts update intervals for dynamic data
+             */
+            function startUpdateIntervals() {
+                setInterval(async () => {
+                    const currentRound = await safeCall(ticketSaleRead.currentRoundId(), roundId);
+                    if (currentRound !== roundId) {
+                        roundId = currentRound;
+                        currentPage = 1; // Reset à la première page pour le nouveau round
+                        await Promise.all([
+                            updateStats(roundId),
+                            updateParticipantsTable(roundId, currentPage),
+                            fetchWinner(),
+                            updateWinnersTable(),
+                            setupEvolutionChart() 
+                        ]);
+                    } else {
+                        await Promise.all([
+                            updateStats(roundId),
+                            updateParticipantsTable(roundId, currentPage)
+                        ]);
+                    }
+                }, 10000);
+                
+                // Interval for countdown, more frequent
+                setInterval(updateCountdown, 1000); 
+            }
+
+            // ===== EVENT LISTENERS =====
+            overlay.addEventListener('click', hideWalletPopup);
+
+            button.addEventListener('click', () => {
+                if (lastAccount) {
+                    lastAccount = null;
+                    isDisconnected = true;
+                    localStorage.setItem("walletDisconnected", "true");
+                    updateButton([]);
+                    return;
+                }
+                showWalletPopup();
+            });
+
+            // Ensure the function is called AFTER everything is rendered
+            window.addEventListener('load', () => {
+                // A slight delay is often needed after 'load' for complex elements (like Chart.js)
+                setTimeout(alignContainerHeights, 100); 
+            });
+
+            // Important: recall the function on resize
+            window.onresize = alignContainerHeights;
+
+            // ===== START APPLICATION =====
+            initializeData();
+            startUpdateIntervals();
         });
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 </html>

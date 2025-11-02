@@ -1803,12 +1803,16 @@
             }
 
             // ===== WALLET CONNECTION FUNCTIONS =====
-
             function getEVMProviders() {
-                if (window.ethereum) {
-                    return [window.ethereum];
+                if (!window.ethereum) return [];
+                
+                // Si multiple providers
+                if (window.ethereum.providers && window.ethereum.providers.length > 0) {
+                    return window.ethereum.providers;
                 }
-                return [];
+                
+                // Si un seul provider
+                return [window.ethereum];
             }
 
             function getWalletName(p) { 
@@ -1926,32 +1930,42 @@
                 const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
                 
                 if (isMobile) {
-                    // Créer le deep link pour MetaMask
-                    const currentUrl = encodeURIComponent(window.location.href);
-                    const metamaskDeepLink = `https://metamask.app.link/dapp/${window.location.hostname}${window.location.pathname}`;
+                    // Deep links pour tous les wallets mobiles
+                    const currentUrl = window.location.href;
                     
-                    const mmBtn = document.createElement('button');
-                    mmBtn.textContent = "Open in MetaMask";
-                    mmBtn.addEventListener('click', () => {
-                        window.location.href = metamaskDeepLink;
+                    const wallets = [
+                        { name: "MetaMask", deepLink: `https://metamask.app.link/dapp/${window.location.hostname}${window.location.pathname}` },
+                        { name: "Trust Wallet", deepLink: `https://link.trustwallet.com/dapp/${window.location.hostname}${window.location.pathname}` },
+                        { name: "Coinbase Wallet", deepLink: `https://go.cb-w.com/dapp?url=${encodeURIComponent(currentUrl)}` },
+                        { name: "Rabby Wallet", deepLink: `https://rabby.io/dapp?url=${encodeURIComponent(currentUrl)}` }
+                    ];
+                    
+                    wallets.forEach(wallet => {
+                        const btn = document.createElement('button');
+                        btn.textContent = `Open in ${wallet.name}`;
+                        btn.addEventListener('click', () => {
+                            window.location.href = wallet.deepLink;
+                        });
+                        popup.appendChild(btn);
                     });
-                    popup.appendChild(mmBtn);
                     
                     overlay.style.display = 'block';
                     popup.style.display = 'block';
                     return;
                 }
                 
-                // Code desktop normal...
+                // CODE PC - Afficher la liste des wallets détectés
                 let providers = getEVMProviders();
                 if (providers.length === 0) { 
-                    showError("No wallet detected!"); 
+                    showError("No EVM wallet detected!"); 
                     return; 
                 }
                 
+                // Afficher chaque wallet avec son nom
                 providers.forEach((p) => {
+                    const walletName = getWalletName(p);
                     const btn = document.createElement('button');
-                    btn.textContent = "Connect Wallet";
+                    btn.textContent = walletName;
                     btn.addEventListener('click', async () => { 
                         hideWalletPopup(); 
                         await connectWallet(p); 

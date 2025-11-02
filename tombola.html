@@ -1359,6 +1359,7 @@
 
     <!-- External libraries -->
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+
     <!-- Main application script -->
 <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
 
@@ -1483,7 +1484,14 @@
             // ===== WALLET CONNECTION FUNCTIONS =====
 
             /**
-             * Gets available EVM providers
+             * Vérifie si on est sur mobile
+             */
+            function isMobile() {
+                return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            }
+
+            /**
+             * Gets available EVM providers (pour desktop)
              */
             function getEVMProviders() {
                 if (!window.ethereum) return [];
@@ -1543,7 +1551,7 @@
             }
 
             /**
-             * Connects to a wallet provider
+             * Connects to a wallet provider (pour desktop)
              */
             async function connectWallet(provider) {
                 let finalError = null;
@@ -1598,62 +1606,104 @@
             }
 
             /**
-             * VERSION SIMPLIFIÉE - Affiche tous les wallets et gère connexion/installation
+             * Gère la connexion mobile avec deep links
+             */
+            async function connectMobileWallet(wallet) {
+                if (wallet.deeplink) {
+                    // Ouvrir le deep link pour lancer l'application wallet
+                    window.location.href = wallet.deeplink;
+                    
+                    // Stocker les infos pour la reconnexion
+                    localStorage.setItem('pendingWalletConnection', JSON.stringify({
+                        wallet: wallet.name,
+                        timestamp: Date.now()
+                    }));
+                    
+                    // Afficher un message d'attente
+                    showLoading(`Opening ${wallet.name}... Please return to this page after connecting.`);
+                    
+                    // Vérifier périodiquement si la connexion a été établie
+                    const checkConnection = setInterval(() => {
+                        if (window.ethereum) {
+                            clearInterval(checkConnection);
+                            connectWallet(window.ethereum);
+                        }
+                    }, 1000);
+                    
+                    // Arrêter la vérification après 30 secondes
+                    setTimeout(() => {
+                        clearInterval(checkConnection);
+                        hideLoading();
+                    }, 30000);
+                } else {
+                    showError(`${wallet.name} connection not supported yet`);
+                }
+            }
+
+            /**
+             * Affiche le popup de sélection de wallet
              */
             function showWalletPopup() {
                 popup.innerHTML = '';
                 
-                // Liste de tous les wallets supportés
-                const allWallets = [
-                    { 
-                        name: "MetaMask", 
-                        id: "metamask",
-                        provider: window.ethereum && window.ethereum.isMetaMask ? window.ethereum : null,
-                        installUrl: "https://metamask.io/download/",
-                        deeplink: "https://metamask.app.link/dapp/" + window.location.hostname + window.location.pathname
-                    },
-                    { 
-                        name: "Coinbase Wallet", 
-                        id: "coinbase",
-                        provider: window.ethereum && window.ethereum.isCoinbaseWallet ? window.ethereum : null,
-                        installUrl: "https://www.coinbase.com/wallet/downloads",
-                        deeplink: "https://go.cb-w.com/dapp?url=" + encodeURIComponent(window.location.href)
-                    },
-                    { 
-                        name: "Rabby Wallet", 
-                        id: "rabby",
-                        provider: window.ethereum && window.ethereum.isRabby ? window.ethereum : null,
-                        installUrl: "https://rabby.io/",
-                        deeplink: "https://rabby.io/"
-                    },
-                    { 
-                        name: "Trust Wallet", 
-                        id: "trust",
-                        provider: window.ethereum && window.ethereum.isTrust ? window.ethereum : null,
-                        installUrl: "https://trustwallet.com/download",
-                        deeplink: "https://link.trustwallet.com/open_url?coin_id=60&url=" + encodeURIComponent(window.location.href)
-                    },
-                    { 
-                        name: "Phantom", 
-                        id: "phantom", 
-                        provider: window.ethereum && window.ethereum.isPhantom ? window.ethereum : null,
-                        installUrl: "https://phantom.app/download",
-                        deeplink: "https://phantom.app/ul/browse/" + encodeURIComponent(window.location.href)
-                    },
-                    { 
-                        name: "Brave Wallet", 
-                        id: "brave",
-                        provider: window.ethereum && window.ethereum.isBraveWallet ? window.ethereum : null,
-                        installUrl: "https://brave.com/wallet/",
-                        deeplink: "https://brave.com/wallet/"
-                    }
-                ];
+                // Sur mobile, afficher les wallets mobiles avec deep links
+                if (isMobile()) {
+                    const mobileWallets = [
+                        { 
+                            name: "MetaMask", 
+                            deeplink: `https://metamask.app.link/dapp/${window.location.hostname}${window.location.pathname}`,
+                            installUrl: "https://metamask.io/download/"
+                        },
+                        { 
+                            name: "Trust Wallet", 
+                            deeplink: `https://link.trustwallet.com/open_url?coin_id=60&url=${encodeURIComponent(window.location.href)}`,
+                            installUrl: "https://trustwallet.com/download"
+                        },
+                        { 
+                            name: "Coinbase Wallet", 
+                            deeplink: `https://go.cb-w.com/dapp?url=${encodeURIComponent(window.location.href)}`,
+                            installUrl: "https://www.coinbase.com/wallet/downloads"
+                        },
+                        { 
+                            name: "Rabby Wallet", 
+                            deeplink: "rabby://",
+                            installUrl: "https://rabby.io/"
+                        },
+                        { 
+                            name: "Phantom", 
+                            deeplink: `https://phantom.app/ul/browse/${encodeURIComponent(window.location.href)}`,
+                            installUrl: "https://phantom.app/download"
+                        }
+                    ];
 
-                // D'abord essayer les providers détectés
-                let providers = getEVMProviders();
-                
-                if (providers.length > 0) {
-                    // Afficher les providers détectés
+                    mobileWallets.forEach(wallet => {
+                        const btn = document.createElement('button');
+                        btn.textContent = wallet.name;
+                        btn.addEventListener('click', () => { 
+                            hideWalletPopup(); 
+                            connectMobileWallet(wallet);
+                        });
+                        popup.appendChild(btn);
+                    });
+
+                    // Ajouter une option WalletConnect
+                    const wcBtn = document.createElement('button');
+                    wcBtn.textContent = "WalletConnect";
+                    wcBtn.addEventListener('click', () => {
+                        hideWalletPopup();
+                        showError("WalletConnect integration à implémenter");
+                    });
+                    popup.appendChild(wcBtn);
+
+                } else {
+                    // Sur desktop, utiliser l'ancienne méthode
+                    let providers = getEVMProviders(); 
+                    
+                    if (providers.length === 0) { 
+                        showError("No EVM-compatible wallet detected!"); 
+                        return; 
+                    }
+
                     providers.sort((a, b) => a.isMetaMask ? -1 : b.isMetaMask ? 1 : 0);
                     providers.forEach((p) => {
                         const walletName = getWalletName(p);
@@ -1665,42 +1715,8 @@
                         });
                         popup.appendChild(btn);
                     });
-                    
-                    // Séparateur
-                    const separator = document.createElement('div');
-                    separator.style.cssText = 'width:100%; height:1px; background:#ccc; margin:10px 0;';
-                    popup.appendChild(separator);
                 }
-
-                // Afficher tous les wallets avec gestion installation/connexion
-                allWallets.forEach(wallet => {
-                    const btn = document.createElement('button');
-                    const isInstalled = wallet.provider !== null;
-                    
-                    if (isInstalled) {
-                        // Wallet installé - connexion directe
-                        btn.textContent = `${wallet.name} (Installed)`;
-                        btn.addEventListener('click', async () => { 
-                            hideWalletPopup(); 
-                            await connectWallet(wallet.provider);
-                        });
-                    } else {
-                        // Wallet non installé - redirection vers installation
-                        btn.textContent = `${wallet.name} (Install)`;
-                        btn.addEventListener('click', () => {
-                            hideWalletPopup();
-                            // Sur mobile, utiliser le deeplink
-                            if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                                window.location.href = wallet.deeplink;
-                            } else {
-                                // Sur desktop, ouvrir dans nouvel onglet
-                                window.open(wallet.installUrl, '_blank');
-                            }
-                        });
-                    }
-                    popup.appendChild(btn);
-                });
-
+                
                 overlay.style.display = 'block';
                 popup.style.display = 'block';
             }
@@ -1711,6 +1727,21 @@
             function hideWalletPopup() { 
                 popup.style.display = 'none'; 
                 overlay.style.display = 'none'; 
+            }
+
+            /**
+             * Vérifie s'il y a une connexion en attente au chargement
+             */
+            function checkPendingConnection() {
+                const pending = localStorage.getItem('pendingWalletConnection');
+                if (pending && window.ethereum) {
+                    const connection = JSON.parse(pending);
+                    // Si la connexion est récente (moins de 2 minutes)
+                    if (Date.now() - connection.timestamp < 120000) {
+                        connectWallet(window.ethereum);
+                    }
+                    localStorage.removeItem('pendingWalletConnection');
+                }
             }
 
             // ===== DATA FETCHING FUNCTIONS =====
@@ -2466,6 +2497,9 @@
                 } else {
                     await updateButton([]);
                 }
+
+                // Vérifier les connexions en attente
+                checkPendingConnection();
             }
 
             /**
@@ -2524,7 +2558,6 @@
             startUpdateIntervals();
         });
     </script>
-
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 </html>

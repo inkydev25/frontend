@@ -1364,6 +1364,7 @@
 <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+<script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1372,144 +1373,228 @@ document.addEventListener('DOMContentLoaded', async () => {
     const overlay = document.getElementById('popupOverlay');
     
     let lastAccount = null;
-    let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
+    let walletConnectProvider = null;
 
-    // ===== SOLUTION SIMPLE ET EFFICACE =====
-
-    /**
-     * Vérifie si on est sur mobile
-     */
-    function isMobile() {
-        return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    }
-
-    /**
-     * Met à jour le bouton de connexion
-     */
     async function updateButton(accounts) {
-        if (isDisconnected) accounts = [];
         const account = accounts.length > 0 ? accounts[0] : null;
         lastAccount = account;
 
         if (account) {
             button.textContent = `Connected: ${account.substring(0, 6)}...${account.slice(-4)}`;
             button.classList.add('connected');
-            console.log("✅ Wallet connected:", account);
-            hideConnectionMessage();
+            console.log("✅ Connected:", account);
         } else {
             button.textContent = 'Connect your wallet';
             button.classList.remove('connected');
-            console.log("🔴 Wallet disconnected");
         }
     }
 
-    /**
-     * Connecte un wallet desktop
-     */
-    async function connectWallet(provider) {
+    // ===== WALLETCONNECT - LA BONNE SOLUTION =====
+    async function connectWithWalletConnect() {
         try {
-            console.log("🔄 Connecting to wallet...");
-            const accounts = await provider.request({ method: 'eth_requestAccounts' });
-            isDisconnected = false;
-            localStorage.setItem("walletDisconnected", "false");
-            await updateButton(accounts);
-            console.log("✅ Wallet connected successfully");
-        } catch (error) {
-            console.error("❌ Connection failed:", error);
-            if (error.code === 4001) {
-                showConnectionMessage("Connection rejected by user", false);
-            } else {
-                showConnectionMessage("Connection failed: " + error.message, false);
-            }
-        }
-    }
-
-    /**
-     * Méthode SIMPLE pour mobile : Ouvre le wallet et attend que l'utilisateur revienne
-     */
-    function connectMobileWallet(wallet) {
-        console.log("📱 Connecting to mobile wallet:", wallet.name);
-        
-        // 1. Stocker l'info de connexion
-        localStorage.setItem('mobileWalletTry', wallet.name);
-        
-        // 2. Afficher instructions claires
-        showConnectionMessage(
-            `🔹 Step 1: Click OK to open ${wallet.name}<br>
-             🔹 Step 2: Approve connection in the app<br>
-             🔹 Step 3: Return here and click REFRESH below`,
-            false
-        );
-
-        // 3. Bouton pour ouvrir le wallet
-        setTimeout(() => {
-            if (confirm(`Open ${wallet.name}? After approving, return here and refresh the page.`)) {
-                // Ouvrir le wallet
-                window.location.href = wallet.deeplink;
-            }
-        }, 100);
-    }
-
-    /**
-     * Vérifie si un wallet a été essayé et attend une connexion
-     */
-    function checkMobileWalletAttempt() {
-        const walletTry = localStorage.getItem('mobileWalletTry');
-        if (walletTry) {
-            showConnectionMessage(
-                `📱 You tried connecting to ${walletTry}. <br>
-                 ✅ If you approved the connection, your wallet should be connected now.<br>
-                 🔄 If not showing as connected, please click the button below to refresh.`,
-                false
-            );
+            showLoading("🔄 Initializing WalletConnect...");
             
-            // Ajouter un bouton de refresh manuel
-            addRefreshButton();
+            // Créer le provider WalletConnect
+            walletConnectProvider = new WalletConnectProvider.default({
+                rpc: {
+                    1: "https://cloudflare-eth.com", // Ethereum
+                    56: "https://bsc-dataseed.binance.org/", // BSC
+                    137: "https://polygon-rpc.com/", // Polygon
+                },
+                chainId: 1,
+                qrcode: true,
+                bridge: "https://bridge.walletconnect.org"
+            });
+
+            // Événements
+            walletConnectProvider.on("connect", (error, payload) => {
+                if (error) throw error;
+                console.log("WalletConnect connected");
+            });
+
+            walletConnectProvider.on("disconnect", (error) => {
+                console.log("WalletConnect disconnected");
+                walletConnectProvider = null;
+                updateButton([]);
+            });
+
+            // Établir la connexion
+            await walletConnectProvider.enable();
+            hideLoading();
+            
+            const accounts = await walletConnectProvider.request({ method: 'eth_accounts' });
+            if (accounts.length > 0) {
+                // Injecter dans window.ethereum pour compatibilité
+                window.ethereum = walletConnectProvider;
+                await updateButton(accounts);
+                showMessage("✅ Connected with WalletConnect!", true);
+            }
+
+        } catch (error) {
+            hideLoading();
+            console.error("WalletConnect error:", error);
+            showMessage("❌ Connection failed: " + error.message, false);
         }
     }
 
-    /**
-     * Ajoute un bouton de refresh manuel
-     */
-    function addRefreshButton() {
-        let refreshBtn = document.getElementById('manualRefreshBtn');
-        if (!refreshBtn) {
-            refreshBtn = document.createElement('button');
-            refreshBtn.id = 'manualRefreshBtn';
-            refreshBtn.textContent = '🔄 Refresh Connection Status';
-            refreshBtn.style.cssText = `
-                position: fixed;
-                bottom: 100px;
-                left: 50%;
-                transform: translateX(-50%);
-                background: #2196F3;
-                color: white;
-                border: none;
-                padding: 12px 20px;
-                border-radius: 8px;
-                cursor: pointer;
-                z-index: 10001;
-                font-size: 14px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            `;
-            refreshBtn.onclick = () => {
-                window.location.reload();
-            };
-            document.body.appendChild(refreshBtn);
-        }
+    // ===== DEEP LINKS AMÉLIORÉS =====
+    async function connectWithDeepLink(wallet) {
+        showMessage(`📱 Opening ${wallet.name}...<br>Approve connection and return here`, false);
+        
+        // Ouvrir le deep link
+        setTimeout(() => {
+            window.location.href = wallet.deeplink;
+        }, 500);
+
+        // Détection de retour améliorée
+        detectWalletReturn(wallet.name);
     }
 
-    /**
-     * Affiche un message de connexion
-     */
-    function showConnectionMessage(message, isSuccess = false) {
-        let messageDiv = document.getElementById('connectionStatus');
-        if (!messageDiv) {
-            messageDiv = document.createElement('div');
-            messageDiv.id = 'connectionStatus';
-            document.body.appendChild(messageDiv);
+    function detectWalletReturn(walletName) {
+        let attempts = 0;
+        const maxAttempts = 30;
+        
+        const checkInterval = setInterval(async () => {
+            attempts++;
+            
+            // Vérifier si un provider est maintenant disponible
+            if (window.ethereum && !window.ethereum.isWalletConnect) {
+                clearInterval(checkInterval);
+                try {
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    if (accounts.length > 0) {
+                        await updateButton(accounts);
+                        showMessage(`✅ Successfully connected to ${walletName}!`, true);
+                    }
+                } catch (error) {
+                    showMessage(`❌ Failed to connect to ${walletName}`, false);
+                }
+            }
+            
+            if (attempts >= maxAttempts) {
+                clearInterval(checkInterval);
+                showMessage(`⏰ Timeout - Please try connecting again`, false);
+            }
+        }, 1000);
+    }
+
+    // ===== POPUP AMÉLIORÉ =====
+    function showWalletPopup() {
+        popup.innerHTML = '';
+        
+        const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        // WalletConnect - Toujours disponible
+        const wcBtn = document.createElement('button');
+        wcBtn.innerHTML = `🔗 <strong>WalletConnect</strong><br><small>Best for mobile browsers</small>`;
+        wcBtn.style.background = '#3b99fc';
+        wcBtn.style.color = 'white';
+        wcBtn.style.textAlign = 'center';
+        wcBtn.style.padding = '15px';
+        wcBtn.onclick = () => {
+            hideWalletPopup();
+            connectWithWalletConnect();
+        };
+        popup.appendChild(wcBtn);
+
+        if (isMobile) {
+            const separator = document.createElement('div');
+            separator.style.cssText = 'width:100%; height:1px; background:#ccc; margin:10px 0;';
+            popup.appendChild(separator);
+
+            // Deep links directs
+            const mobileWallets = [
+                {
+                    name: "MetaMask",
+                    deeplink: `https://metamask.app.link/dapp/${window.location.hostname}${window.location.pathname}?callback=${encodeURIComponent(window.location.href)}`
+                },
+                {
+                    name: "Trust Wallet", 
+                    deeplink: `https://link.trustwallet.com/wc?uri=${encodeURIComponent(`ethereum:${window.location.hostname}@1?action=connect`)}`
+                },
+                {
+                    name: "Coinbase Wallet",
+                    deeplink: `https://go.cb-w.com/wc?uri=${encodeURIComponent(window.location.href)}`
+                },
+                {
+                    name: "Rabby Wallet",
+                    deeplink: `rabby://wc?uri=${encodeURIComponent(window.location.href)}`
+                }
+            ];
+
+            mobileWallets.forEach(wallet => {
+                const btn = document.createElement('button');
+                btn.textContent = wallet.name;
+                btn.onclick = () => {
+                    hideWalletPopup();
+                    connectWithDeepLink(wallet);
+                };
+                popup.appendChild(btn);
+            });
+        } else {
+            // Desktop - Extensions normales
+            if (window.ethereum) {
+                const separator = document.createElement('div');
+                separator.style.cssText = 'width:100%; height:1px; background:#ccc; margin:10px 0;';
+                popup.appendChild(separator);
+
+                const providers = window.ethereum.providers || [window.ethereum];
+                providers.forEach(provider => {
+                    const btn = document.createElement('button');
+                    btn.textContent = getWalletName(provider);
+                    btn.onclick = async () => {
+                        hideWalletPopup();
+                        try {
+                            const accounts = await provider.request({ method: 'eth_requestAccounts' });
+                            await updateButton(accounts);
+                        } catch (error) {
+                            showMessage("❌ Connection failed: " + error.message, false);
+                        }
+                    };
+                    popup.appendChild(btn);
+                });
+            }
         }
         
+        overlay.style.display = 'block';
+        popup.style.display = 'block';
+    }
+
+    // ===== UTILITAIRES =====
+    function showLoading(message) {
+        let loader = document.getElementById('loadingMessage');
+        if (!loader) {
+            loader = document.createElement('div');
+            loader.id = 'loadingMessage';
+            loader.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 20px;
+                border-radius: 10px;
+                z-index: 10002;
+                text-align: center;
+            `;
+            document.body.appendChild(loader);
+        }
+        loader.innerHTML = message;
+    }
+
+    function hideLoading() {
+        const loader = document.getElementById('loadingMessage');
+        if (loader) loader.remove();
+    }
+
+    function showMessage(message, isSuccess) {
+        // Supprimer les anciens messages
+        const oldMsg = document.getElementById('statusMessage');
+        if (oldMsg) oldMsg.remove();
+
+        const messageDiv = document.createElement('div');
+        messageDiv.id = 'statusMessage';
         messageDiv.innerHTML = message;
         messageDiv.style.cssText = `
             position: fixed;
@@ -1520,132 +1605,45 @@ document.addEventListener('DOMContentLoaded', async () => {
             color: white;
             padding: 15px 20px;
             border-radius: 8px;
-            z-index: 10000;
-            font-size: 14px;
+            z-index: 10001;
+            text-align: center;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             max-width: 90%;
-            text-align: center;
-            line-height: 1.4;
         `;
-    }
-
-    function hideConnectionMessage() {
-        const messageDiv = document.getElementById('connectionStatus');
-        const refreshBtn = document.getElementById('manualRefreshBtn');
-        if (messageDiv) messageDiv.remove();
-        if (refreshBtn) refreshBtn.remove();
-        localStorage.removeItem('mobileWalletTry');
-    }
-
-    /**
-     * Affiche le popup de sélection de wallet
-     */
-    function showWalletPopup() {
-        popup.innerHTML = '';
         
-        const isMobileDevice = isMobile();
-        console.log("📱 Mobile device:", isMobileDevice);
-
-        // Wallets avec deep links TESTÉS
-        const mobileWallets = [
-            {
-                name: "MetaMask",
-                deeplink: `https://metamask.app.link/dapp/${window.location.hostname}${window.location.pathname}`,
-            },
-            {
-                name: "Trust Wallet", 
-                deeplink: `https://link.trustwallet.com/open_url?url=${encodeURIComponent(window.location.href)}`,
-            },
-            {
-                name: "Coinbase Wallet",
-                deeplink: `https://go.cb-w.com/dapp?url=${encodeURIComponent(window.location.href)}`, 
-            },
-            {
-                name: "Rabby Wallet",
-                deeplink: `https://rabby.io/connect?url=${encodeURIComponent(window.location.href)}`,
-            }
-        ];
-
-        // Sur mobile: afficher les wallets mobiles
-        if (isMobileDevice) {
-            mobileWallets.forEach(wallet => {
-                const btn = document.createElement('button');
-                btn.textContent = wallet.name;
-                btn.onclick = () => {
-                    hideWalletPopup();
-                    connectMobileWallet(wallet);
-                };
-                popup.appendChild(btn);
-            });
-
-            // Ajouter une option manuelle
-            const manualBtn = document.createElement('button');
-            manualBtn.textContent = "🔧 Manual Connection Help";
-            manualBtn.onclick = () => {
-                hideWalletPopup();
-                showConnectionMessage(
-                    `🔧 Manual Connection Instructions:<br><br>
-                     1. Open your wallet app manually<br>
-                     2. Use its browser to navigate to this page<br>
-                     3. Click "Connect your wallet" here<br>
-                     4. It should detect your wallet automatically`,
-                    false
-                );
-            };
-            popup.appendChild(manualBtn);
-
-        } else {
-            // Sur desktop: extensions de navigateur
-            if (window.ethereum) {
-                const providers = window.ethereum.providers || [window.ethereum];
-                
-                providers.forEach(provider => {
-                    const walletName = getWalletName(provider);
-                    const btn = document.createElement('button');
-                    btn.textContent = walletName;
-                    btn.onclick = async () => {
-                        hideWalletPopup();
-                        await connectWallet(provider);
-                    };
-                    popup.appendChild(btn);
-                });
-            } else {
-                const msg = document.createElement('div');
-                msg.textContent = 'No wallet extension detected';
-                msg.style.cssText = 'text-align:center; padding:10px; color:#666;';
-                popup.appendChild(msg);
-            }
+        document.body.appendChild(messageDiv);
+        
+        if (isSuccess) {
+            setTimeout(() => {
+                if (messageDiv.parentNode) messageDiv.remove();
+            }, 5000);
         }
-        
-        overlay.style.display = 'block';
-        popup.style.display = 'block';
     }
 
-    function hideWalletPopup() { 
-        popup.style.display = 'none'; 
-        overlay.style.display = 'none'; 
+    function hideWalletPopup() {
+        popup.style.display = 'none';
+        overlay.style.display = 'none';
     }
 
     function getWalletName(provider) {
-        if (provider.isRabby) return "Rabby Wallet";
-        if (provider.isTrust) return "Trust Wallet"; 
+        if (provider.isMetaMask) return "MetaMask";
+        if (provider.isTrust) return "Trust Wallet";
         if (provider.isCoinbaseWallet) return "Coinbase Wallet";
-        if (provider.isBraveWallet) return "Brave Wallet";
-        if (provider.isPhantom) return "Phantom";
-        if (provider.isMetaMask) return "MetaMask"; 
-        if (provider.name) return provider.name;
-        return "EVM Wallet";
+        if (provider.isRabby) return "Rabby Wallet";
+        return provider.name || "EVM Wallet";
     }
 
     function disconnectWallet() {
+        if (walletConnectProvider) {
+            walletConnectProvider.disconnect();
+            walletConnectProvider = null;
+        }
         lastAccount = null;
-        isDisconnected = true;
         localStorage.setItem("walletDisconnected", "true");
         updateButton([]);
-        hideConnectionMessage();
     }
 
-    // ===== ÉVÉNEMENTS =====
+    // Événements
     overlay.addEventListener('click', hideWalletPopup);
 
     button.addEventListener('click', () => {
@@ -1656,33 +1654,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         showWalletPopup();
     });
 
-    // Écouter les changements de compte
+    // Initialisation
     if (window.ethereum) {
         window.ethereum.on('accountsChanged', updateButton);
-        window.ethereum.on('chainChanged', () => window.location.reload());
-    }
-
-    // ===== INITIALISATION =====
-    async function initialize() {
-        // Vérifier la connexion existante
-        if (!isDisconnected && window.ethereum) {
-            try {
-                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-                if (accounts.length > 0) {
-                    await updateButton(accounts);
-                }
-            } catch (error) {
-                console.error("Error checking connection:", error);
+        
+        try {
+            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+            if (accounts.length > 0 && localStorage.getItem("walletDisconnected") !== "true") {
+                await updateButton(accounts);
             }
+        } catch (error) {
+            console.log("No existing connection");
         }
-
-        // Vérifier les tentatives mobiles
-        checkMobileWalletAttempt();
-
-        console.log("🚀 Wallet system ready");
     }
-
-    initialize();
 });
 </script>
 </body>

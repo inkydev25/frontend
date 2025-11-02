@@ -1804,79 +1804,27 @@
 
             // ===== WALLET CONNECTION FUNCTIONS =====
             function getEVMProviders() {
-                // Pour les wallets mobiles qui injectent directement window.ethereum
+                // Solution brute pour mobile
                 if (window.ethereum) {
-                    // Cas 1: Multiple providers (MetaMask, WalletConnect, etc.)
-                    if (window.ethereum.providers && window.ethereum.providers.length > 0) {
-                        return window.ethereum.providers;
-                    }
-                    // Cas 2: Provider unique
                     return [window.ethereum];
                 }
                 
-                // Pour les wallets mobiles spécifiques
-                const mobileProviders = [];
+                // Fallback pour certains wallets mobiles
+                if (typeof window.web3 !== 'undefined') {
+                    return [window.web3.currentProvider];
+                }
                 
-                // Trust Wallet
+                // Dernier recours - vérifier les wallets spécifiques
                 if (window.trustwallet) {
-                    mobileProviders.push(window.trustwallet);
+                    return [window.trustwallet];
                 }
                 
-                // Coinbase Wallet
                 if (window.coinbaseWalletExtension) {
-                    mobileProviders.push(window.coinbaseWalletExtension);
+                    return [window.coinbaseWalletExtension];
                 }
                 
-                // Brave Wallet
-                if (window.braveEthereum) {
-                    mobileProviders.push(window.braveEthereum);
-                }
-                
-                // D'autres wallets mobiles
-                if (window.web3 && !window.ethereum) {
-                    mobileProviders.push(window.web3.currentProvider);
-                }
-                
-                return mobileProviders.length > 0 ? mobileProviders : [];
+                return [];
             }
-
-            function detectMobileWallets() {
-    const wallets = [];
-    
-    // MetaMask Mobile
-    if (window.ethereum && window.ethereum.isMetaMask) {
-        wallets.push({
-            provider: window.ethereum,
-            name: "MetaMask Mobile"
-        });
-    }
-    
-    // Trust Wallet
-    if (window.trustwallet) {
-        wallets.push({
-            provider: window.trustwallet,
-            name: "Trust Wallet"
-        });
-    }
-    
-    // Coinbase Wallet Mobile
-    if (window.coinbaseWalletExtension) {
-        wallets.push({
-            provider: window.coinbaseWalletExtension,
-            name: "Coinbase Wallet"
-        });
-    }
-    
-    // WalletConnect (si utilisé)
-    if (window.walletConnect) {
-        wallets.push({
-            provider: window.walletConnect,
-            name: "WalletConnect"
-        });
-    }
-    
-    return wallets;
-}
 
             function getWalletName(p) { 
                 if (p.isRabby) return "Rabby Wallet";

@@ -96,8 +96,8 @@
         }
 
         .button, .total-buy button {
-            padding: 10px 25px;
-            font-size: 12px;
+            padding: 10px 5px;
+            font-size: 11px;
             font-weight: bold;
             color: var(--text-color-light);
             width: 200px;
@@ -1377,7 +1377,7 @@
             const EXPLORER_BASE_URL = "https://explorer.testnet.nexera.network/tx/";
 
             // Nouvelle adresse du contrat
-            const TICKET_SALE_ADDRESS = "0x639A702c53F0c2CB3677691e2C6B22A3c4535A02";
+            const TICKET_SALE_ADDRESS = "0x9904D652640074949E7063a3a172c174c13c6165";
             const INKY_ADDRESS = "0x6EB2C1fE4e3B48af4905A0209658810B61343438";
 
             // Nouveau ABI avec les fonctions optimisées
@@ -1580,10 +1580,17 @@
                 const nextButton = document.getElementById('nextPage');
 
                 try {
-                    // Afficher le loading seulement si c'est le chargement initial ET que le tableau est vide
-                    const isInitialLoad = page === 1 && tbody.children.length === 0;
+                    // Vérifier si on a déjà des données ou le message "No participants yet"
+                    const hasNoParticipantsMessage = tbody.children.length === 1 && 
+                                                tbody.children[0].querySelector('td[colspan="3"]') && 
+                                                tbody.children[0].textContent.includes("No participants yet");
                     
-                    if (isInitialLoad) {
+                    const hasRealData = tbody.children.length > 0 && !hasNoParticipantsMessage;
+                    
+                    // Afficher le loading SEULEMENT pour le vrai premier chargement (tableau complètement vide)
+                    const isTrueInitialLoad = page === 1 && tbody.children.length === 0;
+                    
+                    if (isTrueInitialLoad) {
                         if (loadingMessage) {
                             loadingMessage.style.display = 'block';
                         }
@@ -1609,7 +1616,7 @@
                         participantsTable.style.display = 'table';
                     }
 
-                    // Mettre à jour la pagination IMMÉDIATEMENT
+                    // Mettre à jour la pagination
                     const totalPages = Math.ceil(totalParticipantsCount / pageSize);
                     
                     if (pagination) {
@@ -1630,21 +1637,24 @@
 
                     // Si la liste est vide
                     if (!participantsPage || participantsPage.length === 0) {
-                        if (tbody.children.length === 0 || tbody.children[0].textContent !== "No participants yet") {
+                        // Ne mettre à jour que si le message n'est pas déjà affiché
+                        if (!hasNoParticipantsMessage) {
                             tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; opacity:0.7;">No participants yet</td></tr>`;
                         }
                         return;
                     }
 
                     // Vérifier si les données ont réellement changé avant de vider le tableau
-                    const currentData = Array.from(tbody.querySelectorAll('tr')).map(tr => {
-                        const cells = tr.querySelectorAll('td');
-                        return {
-                            id: cells[0].textContent,
-                            wallet: cells[1].getAttribute('title'),
-                            tickets: cells[2].textContent
-                        };
-                    });
+                    const currentData = Array.from(tbody.querySelectorAll('tr'))
+                        .filter(tr => !tr.querySelector('td[colspan="3"]')) // Exclure le message "No participants"
+                        .map(tr => {
+                            const cells = tr.querySelectorAll('td');
+                            return {
+                                id: cells[0].textContent,
+                                wallet: cells[1].getAttribute('title'),
+                                tickets: cells[2].textContent
+                            };
+                        });
 
                     const newData = participantsPage.map((participant, index) => {
                         const startId = (page - 1) * pageSize + 1;
@@ -1655,10 +1665,16 @@
                         };
                     });
 
-                    // Ne mettre à jour le DOM que si les données ont changé
-                    const hasChanged = JSON.stringify(currentData) !== JSON.stringify(newData);
-                    
-                    if (hasChanged || isInitialLoad) {
+                    // Déterminer si une mise à jour est nécessaire
+                    const needsUpdate = 
+                        // Cas 1: On passe de "No participants" à des participants
+                        (hasNoParticipantsMessage && participantsPage.length > 0) ||
+                        // Cas 2: On a des données qui ont changé
+                        (hasRealData && JSON.stringify(currentData) !== JSON.stringify(newData)) ||
+                        // Cas 3: Vrai chargement initial
+                        isTrueInitialLoad;
+
+                    if (needsUpdate) {
                         tbody.innerHTML = '';
                         
                         // Remplir le tableau avec les données de la page
@@ -1666,6 +1682,7 @@
                         
                         participantsPage.forEach((participant, index) => {
                             const tr = document.createElement("tr");
+                            tr.dataset.addr = participant.wallet;
                             tr.innerHTML = `
                                 <td><span class="id-cell">${startId + index}</span></td>
                                 <td title="${participant.wallet}">${participant.wallet.substring(0,6)}...${participant.wallet.slice(-4)}</td>
@@ -1677,7 +1694,7 @@
 
                 } catch (err) {
                     console.error("Failed to update participants table:", err);
-                    // Afficher l'erreur seulement si c'est le chargement initial
+                    // Afficher l'erreur seulement pour le vrai chargement initial
                     if (page === 1 && tbody.children.length === 0) {
                         if (loadingMessage) {
                             loadingMessage.textContent = 'Failed to load data.';
@@ -1796,15 +1813,13 @@
                 return [window.ethereum];
             }
 
-            /**
-             * Gets the wallet name from provider
-             */
             function getWalletName(p) { 
-                if (p.isMetaMask) return "MetaMask";
-                if (p.isBraveWallet) return "Brave Wallet";
+                if (p.isRabby) return "Rabby Wallet";
+                if (p.isTrust) return "Trust Wallet"; 
                 if (p.isCoinbaseWallet) return "Coinbase Wallet";
-                if (p.isTally) return "Tally Ho!";
+                if (p.isBraveWallet) return "Brave Wallet";
                 if (p.isPhantom) return "Phantom";
+                if (p.isMetaMask) return "MetaMask"; 
                 if (p.name) return p.name;
                 return "EVM Wallet";
             }
@@ -2263,7 +2278,7 @@
                     }
                 } catch (err) {
                     console.error("Failed to check draw status:", err);
-                    showError("Unable to verify draw status. Please try again.");
+                    showError("Server is down. Please try later.");
                     return; // Exit the function if there's an API error
                 }
                 if (!lastAccount) { showError("Connect your wallet first"); return; }

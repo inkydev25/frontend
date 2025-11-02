@@ -157,8 +157,8 @@
 
         /* Connect Button */
         .button {
-            padding: 10px 25px;
-            font-size: 12px;
+            padding: 10px 5px;
+            font-size: 11px;
             font-weight: bold;
             color: var(--text-color-light);
             width: 200px; 
@@ -1257,11 +1257,12 @@ class WalletManager {
     }
 
     getWalletName(p) {
-        if (p.isMetaMask) return "MetaMask";
-        if (p.isBraveWallet) return "Brave Wallet";
+        if (p.isRabby) return "Rabby Wallet";
+        if (p.isTrust) return "Trust Wallet"; 
         if (p.isCoinbaseWallet) return "Coinbase Wallet";
-        if (p.isTally) return "Tally Ho!";
+        if (p.isBraveWallet) return "Brave Wallet";
         if (p.isPhantom) return "Phantom";
+        if (p.isMetaMask) return "MetaMask"; 
         if (p.name) return p.name;
         return "EVM Wallet";
     }

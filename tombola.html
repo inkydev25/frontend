@@ -1359,6 +1359,7 @@
 
     <!-- External libraries -->
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@coinbase/wallet-sdk@4.3.0/dist/index.js"></script>
 
     <!-- Main application script -->
 <script>
@@ -1369,6 +1370,20 @@
         const overlay = document.getElementById('popupOverlay');
         let lastAccount = null;
         let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
+        
+        // Coinbase Wallet SDK
+        let coinbaseWalletSDK;
+
+        // ===== COINBASE WALLET SDK INITIALIZATION =====
+        function initializeCoinbaseWallet() {
+            if (typeof window.CoinbaseWalletSDK !== 'undefined') {
+                coinbaseWalletSDK = new window.CoinbaseWalletSDK({
+                    appName: "INKY Tombola",
+                    appLogoUrl: "https://yourdomain.com/inky-logo.png",
+                    darkMode: false
+                });
+            }
+        }
 
         // ===== WALLET DETECTION FUNCTIONS =====
 
@@ -1377,30 +1392,26 @@
          */
         function detectMobileWallets() {
             const wallets = [];
-            
-            // Vérifier si on est sur mobile
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
             if (!isMobile) {
                 return wallets;
             }
 
-            // Détection des wallets mobiles via deep linking
-            if (typeof window.ethereum !== 'undefined') {
-                wallets.push({
-                    name: "MetaMask",
-                    id: "metamask",
-                    mobile: true,
-                    link: "https://metamask.app.link/dapp/" + window.location.hostname
-                });
-            }
-
-            // Coinbase Wallet
+            // Coinbase Wallet avec SDK
             wallets.push({
                 name: "Coinbase Wallet",
                 id: "coinbase",
                 mobile: true,
-                link: `https://go.cb-w.com/dapp?chain_id=1&dapp_url=${encodeURIComponent(window.location.href)}`
+                connector: "coinbase"
+            });
+
+            // MetaMask mobile
+            wallets.push({
+                name: "MetaMask",
+                id: "metamask",
+                mobile: true,
+                connector: "metamask"
             });
 
             // Trust Wallet
@@ -1408,23 +1419,15 @@
                 name: "Trust Wallet",
                 id: "trust",
                 mobile: true,
-                link: `https://link.trustwallet.com/dapp?url=${encodeURIComponent(window.location.href)}`
+                connector: "trust"
             });
 
-            // Rabby Wallet (mobile)
-            wallets.push({
-                name: "Rabby Wallet",
-                id: "rabby",
-                mobile: true,
-                link: `rabby://dapp?url=${encodeURIComponent(window.location.href)}`
-            });
-
-            // WalletConnect (option générique)
+            // WalletConnect
             wallets.push({
                 name: "WalletConnect",
                 id: "walletconnect",
                 mobile: true,
-                link: "#walletconnect"
+                connector: "walletconnect"
             });
 
             return wallets;
@@ -1440,32 +1443,46 @@
                 return wallets;
             }
 
-            // Si window.ethereum existe mais n'a pas de providers, c'est probablement MetaMask
             if (!window.ethereum.providers) {
                 wallets.push({
                     name: "MetaMask",
                     id: "metamask",
                     mobile: false,
-                    provider: window.ethereum
+                    connector: "metamask"
                 });
                 return wallets;
             }
 
-            // Si multiple providers sont disponibles
             window.ethereum.providers.forEach(provider => {
                 let walletName = "EVM Wallet";
+                let connector = "ethereum";
                 
-                if (provider.isMetaMask) walletName = "MetaMask";
-                if (provider.isRabby) walletName = "Rabby Wallet";
-                if (provider.isTrust) walletName = "Trust Wallet";
-                if (provider.isCoinbaseWallet) walletName = "Coinbase Wallet";
-                if (provider.isBraveWallet) walletName = "Brave Wallet";
-                if (provider.isPhantom) walletName = "Phantom";
+                if (provider.isMetaMask) {
+                    walletName = "MetaMask";
+                    connector = "metamask";
+                }
+                if (provider.isRabby) {
+                    walletName = "Rabby Wallet";
+                    connector = "rabby";
+                }
+                if (provider.isTrust) {
+                    walletName = "Trust Wallet";
+                    connector = "trust";
+                }
+                if (provider.isCoinbaseWallet) {
+                    walletName = "Coinbase Wallet";
+                    connector = "coinbase";
+                }
+                if (provider.isBraveWallet) {
+                    walletName = "Brave Wallet";
+                    connector = "brave";
+                }
 
                 wallets.push({
                     name: walletName,
                     id: walletName.toLowerCase().replace(' ', '_'),
                     mobile: false,
+                    connector: connector,
                     provider: provider
                 });
             });
@@ -1486,9 +1503,17 @@
             if (account) {
                 button.textContent = `Connected: ${account.substring(0, 6)}...${account.slice(-4)}`;
                 button.classList.add('connected');
+                
+                // Stocker la connexion réussie
+                localStorage.setItem("walletConnected", "true");
+                localStorage.setItem("connectedWallet", account);
             } else {
                 button.textContent = 'Connect your wallet';
                 button.classList.remove('connected');
+                
+                // Nettoyer le stockage si déconnecté
+                localStorage.removeItem("walletConnected");
+                localStorage.removeItem("connectedWallet");
             }
         }
 
@@ -1504,60 +1529,138 @@
                 return true;
             } catch (err) {
                 console.error("Wallet connection failed:", err);
-                let errorMessage = "Wallet connection failed";
-
-                if (err.code === 4001) {
-                    errorMessage = "Connection rejected by user.";
-                } else if (err.code === -32002) {
-                    errorMessage = "Pending request. Please check your wallet's extension/pop-up.";
-                } else if (err.message) {
-                    errorMessage = err.message.substring(0, 100);
-                }
-
-                showError(errorMessage);
+                handleConnectionError(err);
                 return false;
             }
         }
 
         /**
-         * Gère la connexion mobile via deep linking
+         * Connecte Coinbase Wallet avec le SDK
          */
-        function connectMobileWallet(wallet) {
-            if (wallet.id === "walletconnect") {
-                // Pour WalletConnect, on pourrait implémenter une logique spécifique
-                showError("WalletConnect support coming soon");
-                return;
-            }
+        async function connectCoinbaseWallet() {
+            try {
+                if (!coinbaseWalletSDK) {
+                    initializeCoinbaseWallet();
+                }
 
-            // Ouvrir le lien deep pour le wallet mobile
-            window.open(wallet.link, '_blank');
-            
-            // Stocker l'information qu'on attend une connexion mobile
-            localStorage.setItem("awaitingMobileConnection", "true");
-            localStorage.setItem("mobileWallet", wallet.id);
-            
-            // Afficher un message d'attente
-            showError(`Opening ${wallet.name}... Please return to this page after connecting.`);
-            
-            // Cacher la popup
-            hideWalletPopup();
+                const provider = coinbaseWalletSDK?.makeWeb3Provider() || window.ethereum;
+                
+                // Utiliser le même flow que l'exemple Nukl.ai
+                const accounts = await provider.request({
+                    method: 'eth_requestAccounts'
+                });
+
+                if (accounts && accounts.length > 0) {
+                    isDisconnected = false;
+                    localStorage.setItem("walletDisconnected", "false");
+                    await updateButton(accounts);
+                    return true;
+                }
+                
+                return false;
+                
+            } catch (err) {
+                console.error("Coinbase Wallet connection failed:", err);
+                handleConnectionError(err);
+                return false;
+            }
         }
 
         /**
-         * Vérifie si une connexion mobile est en attente
+         * Gère la connexion mobile avec deep linking
          */
-        function checkMobileConnection() {
+        async function connectMobileWallet(wallet) {
+            try {
+                switch (wallet.connector) {
+                    case "coinbase":
+                        // Utiliser l'URL exacte comme dans l'exemple Nukl.ai
+                        const coinbaseLink = `https://keys.coinbase.com/connect?sdkName=%40coinbase%2Fwallet-sdk&sdkVersion=4.3.0&origin=${encodeURIComponent(window.location.origin)}&coop=null`;
+                        
+                        // Stocker l'état de tentative de connexion
+                        localStorage.setItem("awaitingMobileConnection", "true");
+                        localStorage.setItem("mobileWallet", "coinbase");
+                        
+                        // Ouvrir le lien de connexion
+                        window.location.href = coinbaseLink;
+                        break;
+                        
+                    case "metamask":
+                        const metamaskLink = `https://metamask.app.link/dapp/${window.location.hostname}${window.location.pathname}`;
+                        localStorage.setItem("awaitingMobileConnection", "true");
+                        localStorage.setItem("mobileWallet", "metamask");
+                        window.location.href = metamaskLink;
+                        break;
+                        
+                    case "trust":
+                        const trustLink = `https://link.trustwallet.com/dapp?url=${encodeURIComponent(window.location.href)}`;
+                        localStorage.setItem("awaitingMobileConnection", "true");
+                        localStorage.setItem("mobileWallet", "trust");
+                        window.location.href = trustLink;
+                        break;
+                        
+                    default:
+                        showError(`${wallet.name} mobile connection not yet implemented`);
+                }
+            } catch (err) {
+                console.error("Mobile wallet connection error:", err);
+                showError("Failed to connect to mobile wallet");
+            }
+        }
+
+        /**
+         * Vérifie si une connexion mobile est en attente et se reconnecte
+         */
+        async function checkMobileConnection() {
             const awaitingConnection = localStorage.getItem("awaitingMobileConnection") === "true";
             const mobileWallet = localStorage.getItem("mobileWallet");
             
-            if (awaitingConnection && mobileWallet && typeof window.ethereum !== 'undefined') {
-                // Une connexion mobile semble avoir réussi
-                localStorage.removeItem("awaitingMobileConnection");
-                localStorage.removeItem("mobileWallet");
+            if (awaitingConnection && mobileWallet) {
+                // Attendre un peu que le wallet soit initialisé
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 
-                // Connecter avec le provider maintenant disponible
-                connectDesktopWallet(window.ethereum);
+                try {
+                    if (typeof window.ethereum !== 'undefined') {
+                        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                        
+                        if (accounts.length > 0) {
+                            // Connexion réussie !
+                            localStorage.removeItem("awaitingMobileConnection");
+                            localStorage.removeItem("mobileWallet");
+                            isDisconnected = false;
+                            localStorage.setItem("walletDisconnected", "false");
+                            await updateButton(accounts);
+                            showError(`✅ Successfully connected to ${mobileWallet}!`, 3000);
+                        } else {
+                            // Pas encore connecté, continuer à attendre
+                            setTimeout(checkMobileConnection, 1000);
+                        }
+                    } else {
+                        // Provider pas encore disponible, continuer à attendre
+                        setTimeout(checkMobileConnection, 1000);
+                    }
+                } catch (err) {
+                    console.error("Error checking mobile connection:", err);
+                    // Réessayer après un délai
+                    setTimeout(checkMobileConnection, 1000);
+                }
             }
+        }
+
+        /**
+         * Gère les erreurs de connexion
+         */
+        function handleConnectionError(err) {
+            let errorMessage = "Wallet connection failed";
+
+            if (err.code === 4001) {
+                errorMessage = "Connection rejected by user.";
+            } else if (err.code === -32002) {
+                errorMessage = "Pending request. Please check your wallet.";
+            } else if (err.message) {
+                errorMessage = err.message.substring(0, 100);
+            }
+
+            showError(errorMessage);
         }
 
         // ===== POPUP MANAGEMENT =====
@@ -1568,7 +1671,6 @@
         function showWalletPopup() {
             popup.innerHTML = '';
             
-            // Détecter les wallets disponibles
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             const availableWallets = isMobile ? detectMobileWallets() : detectDesktopWallets();
             
@@ -1577,22 +1679,24 @@
                 return;
             }
 
-            // Afficher les wallets disponibles
             availableWallets.forEach(wallet => {
                 const btn = document.createElement('button');
                 btn.textContent = wallet.name;
                 btn.className = 'wallet-button';
                 
-                if (wallet.mobile) {
-                    // Wallet mobile - utiliser deep linking
-                    btn.addEventListener('click', () => connectMobileWallet(wallet));
-                } else {
-                    // Wallet desktop - connexion directe
-                    btn.addEventListener('click', async () => {
-                        hideWalletPopup();
-                        await connectDesktopWallet(wallet.provider);
-                    });
-                }
+                btn.addEventListener('click', async () => {
+                    hideWalletPopup();
+                    
+                    if (wallet.mobile) {
+                        await connectMobileWallet(wallet);
+                    } else {
+                        if (wallet.connector === "coinbase") {
+                            await connectCoinbaseWallet();
+                        } else {
+                            await connectDesktopWallet(wallet.provider || window.ethereum);
+                        }
+                    }
+                });
                 
                 popup.appendChild(btn);
             });
@@ -1642,6 +1746,8 @@
                 lastAccount = null;
                 isDisconnected = true;
                 localStorage.setItem("walletDisconnected", "true");
+                localStorage.removeItem("walletConnected");
+                localStorage.removeItem("connectedWallet");
                 updateButton([]);
                 return;
             }
@@ -1660,10 +1766,13 @@
          * Initialise la connexion au chargement
          */
         async function initializeWallet() {
-            // Vérifier d'abord les connexions mobiles en attente
-            checkMobileConnection();
+            // Initialiser Coinbase Wallet SDK
+            initializeCoinbaseWallet();
             
-            // Ensuite, vérifier les connexions existantes
+            // Vérifier les connexions mobiles en attente
+            await checkMobileConnection();
+            
+            // Vérifier les connexions existantes
             if (!isDisconnected && typeof window.ethereum !== 'undefined') {
                 try {
                     const accounts = await window.ethereum.request({ method: 'eth_accounts' });
@@ -1679,10 +1788,18 @@
         // Démarrer l'initialisation
         initializeWallet();
 
-        // Vérifier périodiquement les connexions mobiles (pour le cas où l'utilisateur revient à la page)
+        // Vérifier périodiquement les connexions mobiles
         setInterval(checkMobileConnection, 2000);
+        
+        // Vérifier aussi quand la page devient visible (retour d'une app externe)
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                checkMobileConnection();
+            }
+        });
     });
 </script>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 </html>

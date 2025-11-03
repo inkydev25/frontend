@@ -1357,6 +1357,9 @@
     <img src="NXRA-logo.png" class="floating-logo" style="top:70%;left:80%; animation-delay:6.5s;">
     <img src="inky-logo.png" class="floating-logo" style="top:70%;left:6%; animation-delay:8s;">
 
+<script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+<script src="https://unpkg.com/@coinbase/wallet-sdk@4.3.0/dist/index.js"></script>
+
 <script>
     document.addEventListener('DOMContentLoaded', async () => {
         const button = document.getElementById('connectButton');
@@ -1369,14 +1372,12 @@
         function detectWallets() {
             const wallets = [];
             
-            // Coinbase Wallet
             wallets.push({
                 name: "Coinbase Wallet",
                 id: "coinbase", 
                 connector: "coinbase"
             });
 
-            // MetaMask
             wallets.push({
                 name: "MetaMask",
                 id: "metamask",
@@ -1400,16 +1401,15 @@
             }
         }
 
-        // CONNEXION COINBASE WALLET - URLS CORRECTES
+        // CONNEXION COINBASE WALLET AVEC WALLETCONNECT
         async function connectCoinbaseWallet() {
             try {
-                console.log("Connecting to Coinbase Wallet...");
+                console.log("Connecting to Coinbase Wallet with WalletConnect...");
 
-                // Méthode 1: Essayer d'abord avec le provider direct
+                // Méthode 1: Essayer d'abord le provider direct
                 if (typeof window.ethereum !== 'undefined') {
                     let provider = window.ethereum;
                     
-                    // Si multiple providers, chercher Coinbase Wallet
                     if (window.ethereum.providers) {
                         const coinbaseProvider = window.ethereum.providers.find(p => p.isCoinbaseWallet);
                         if (coinbaseProvider) {
@@ -1417,11 +1417,38 @@
                         }
                     }
 
-                    console.log("Using provider:", provider);
-                    const accounts = await provider.request({
-                        method: 'eth_requestAccounts'
+                    try {
+                        const accounts = await provider.request({
+                            method: 'eth_requestAccounts'
+                        });
+
+                        if (accounts && accounts.length > 0) {
+                            isDisconnected = false;
+                            localStorage.setItem("walletDisconnected", "false");
+                            await updateButton(accounts);
+                            showError("✅ Successfully connected!", 3000);
+                            return true;
+                        }
+                    } catch (error) {
+                        console.log("Direct connection failed, trying WalletConnect...");
+                    }
+                }
+
+                // Méthode 2: WalletConnect pour l'approval mobile
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                
+                if (isMobile && typeof WalletConnectProvider !== 'undefined') {
+                    // Créer le provider WalletConnect
+                    const provider = new WalletConnectProvider({
+                        infuraId: "27e484dcd9e3efcfd25a83a78777cdf1", // Infura public pour test
+                        qrcode: false,
+                        chainId: 8453, // Base chain
                     });
 
+                    // Activer la connexion - ÇA AFFICHE L'APPROVAL
+                    await provider.enable();
+
+                    const accounts = provider.accounts;
                     if (accounts && accounts.length > 0) {
                         isDisconnected = false;
                         localStorage.setItem("walletDisconnected", "false");
@@ -1429,29 +1456,30 @@
                         showError("✅ Successfully connected to Coinbase Wallet!", 3000);
                         return true;
                     }
-                }
-
-                // Méthode 2: Si le provider direct échoue, utiliser le deep linking
-                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                
-                if (isMobile) {
-                    // URLS DE DEEP LINKING CORRECTES POUR COINBASE WALLET :
-                    const dappUrl = encodeURIComponent(window.location.href);
-                    
-                    // Essayer différentes URLs de deep linking
-                    const deepLinkUrls = [
-                        `https://go.cb-w.com/dapp?url=${dappUrl}`,
-                        `https://coinbase.com/wallet-connect/dapp?url=${dappUrl}`,
-                        `cbwallet://wc?uri=${dappUrl}`
-                    ];
-
-                    console.log("Trying deep links:", deepLinkUrls);
-                    
-                    // Essayer la première URL
-                    window.location.href = deepLinkUrls[0];
-                    
                 } else {
-                    showError("Please install Coinbase Wallet browser extension");
+                    // Méthode 3: SDK Coinbase Wallet pour desktop
+                    if (typeof CoinbaseWalletSDK !== 'undefined') {
+                        const coinbaseWallet = new CoinbaseWalletSDK({
+                            appName: "INKY Tombola",
+                            appLogoUrl: window.location.origin + "/inky-logo.png",
+                            darkMode: false
+                        });
+
+                        const provider = coinbaseWallet.makeWeb3Provider();
+                        const accounts = await provider.request({
+                            method: 'eth_requestAccounts'
+                        });
+
+                        if (accounts && accounts.length > 0) {
+                            isDisconnected = false;
+                            localStorage.setItem("walletDisconnected", "false");
+                            await updateButton(accounts);
+                            showError("✅ Successfully connected!", 3000);
+                            return true;
+                        }
+                    } else {
+                        showError("Please install Coinbase Wallet");
+                    }
                 }
 
             } catch (error) {
@@ -1483,16 +1511,7 @@
                 }
 
                 if (!provider) {
-                    // Deep linking pour MetaMask mobile
-                    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                    if (isMobile) {
-                        const metamaskDeepLink = `https://metamask.app.link/dapp/${window.location.hostname}${window.location.pathname}`;
-                        console.log("Redirecting to MetaMask:", metamaskDeepLink);
-                        window.location.href = metamaskDeepLink;
-                        return;
-                    } else {
-                        throw new Error("MetaMask not detected");
-                    }
+                    throw new Error("MetaMask not detected");
                 }
 
                 const accounts = await provider.request({

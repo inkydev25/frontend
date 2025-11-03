@@ -1368,14 +1368,6 @@
         let lastAccount = null;
         let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
 
-        // CONFIGURATION COINBASE - REMPLACEZ PAR VOS INFOS
-        const COINBASE_CONFIG = {
-            // ⚠️ REMPLACEZ par votre domaine réel en production
-            origin: "https://inkydev25.github.io/frontend/tombola.html", // ex: "https://votresite.com"
-            appName: "INKY Tombola",
-            appLogoUrl: "https://inkydev25.github.io/frontend/inky-logo.png"
-        };
-
         function detectWallets() {
             return [
                 { name: "Coinbase Wallet", id: "coinbase" },
@@ -1397,33 +1389,38 @@
             }
         }
 
-        // CONNEXION COINBASE WALLET AVEC ORIGINE CONFIGURÉE
+        // SOLUTION FINALE - MÊME APPROCHE QUE NUKL.AI
         async function connectCoinbaseWallet() {
             try {
-                // VÉRIFIER QUE L'ORIGINE EST CORRECTE
-                if (COINBASE_CONFIG.origin.includes('localhost') || COINBASE_CONFIG.origin.includes('127.0.0.1')) {
-                    showError("Coinbase Wallet ne fonctionne pas sur localhost. Déployez votre site en production.");
-                    return;
-                }
-
-                // URL COINBASE AVEC ORIGINE VALIDE
+                // URL EXACTEMENT COMME NUKL.AI
+                const currentUrl = window.location.href;
+                const origin = window.location.origin;
+                
+                // ⚠️ IMPORTANT: Utiliser window.location.origin dynamiquement
                 const coinbaseConnectUrl = 
                     `https://keys.coinbase.com/connect?` +
                     `sdkName=%40coinbase%2Fwallet-sdk&` +
                     `sdkVersion=4.3.0&` +
-                    `origin=${encodeURIComponent(COINBASE_CONFIG.origin)}&` +
+                    `origin=${encodeURIComponent(origin)}&` +
                     `coop=null&` +
-                    `redirectUrl=${encodeURIComponent(window.location.href)}&` +
-                    `appName=${encodeURIComponent(COINBASE_CONFIG.appName)}&` +
-                    `appLogoUrl=${encodeURIComponent(COINBASE_CONFIG.appLogoUrl)}`;
+                    `redirectUrl=${encodeURIComponent(currentUrl)}`;
 
                 console.log("Coinbase Connect URL:", coinbaseConnectUrl);
                 
-                // Stocker l'état
+                // Vérifier si l'URL est accessible
+                try {
+                    const response = await fetch(coinbaseConnectUrl, { method: 'HEAD' });
+                    console.log("Coinbase URL status:", response.status);
+                } catch (e) {
+                    console.log("Cannot pre-check Coinbase URL");
+                }
+                
+                // Stocker l'état AVANT la redirection
                 localStorage.setItem("awaitingCoinbaseApproval", "true");
                 localStorage.setItem("approvalTimestamp", Date.now().toString());
+                localStorage.setItem("originalUrl", currentUrl);
                 
-                // Rediriger
+                // Rediriger IMMÉDIATEMENT
                 window.location.href = coinbaseConnectUrl;
                 
             } catch (error) {
@@ -1432,37 +1429,82 @@
             }
         }
 
-        // VÉRIFIER LE RETOUR
+        // VÉRIFICATION AMÉLIORÉE DU RETOUR
         async function checkCoinbaseReturn() {
             const awaitingApproval = localStorage.getItem("awaitingCoinbaseApproval") === "true";
             const approvalTimestamp = parseInt(localStorage.getItem("approvalTimestamp") || "0");
+            const originalUrl = localStorage.getItem("originalUrl");
             
-            if (awaitingApproval && (Date.now() - approvalTimestamp < 2 * 60 * 1000)) {
-                console.log("Checking Coinbase return...");
+            // Vérifier si on est de retour (URL différente de l'originale)
+            const isReturned = originalUrl && window.location.href !== originalUrl;
+            const isRecent = Date.now() - approvalTimestamp < 3 * 60 * 1000;
+            
+            if (awaitingApproval && isRecent && (isReturned || typeof window.ethereum !== 'undefined')) {
+                console.log("Detected Coinbase return, checking connection...");
                 
                 try {
+                    // Attendre un peu
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                    // Méthode 1: Vérifier window.ethereum
                     if (typeof window.ethereum !== 'undefined') {
-                        await new Promise(resolve => setTimeout(resolve, 1500));
-                        
                         const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-                        
                         if (accounts && accounts.length > 0) {
-                            // SUCCÈS
-                            localStorage.removeItem("awaitingCoinbaseApproval");
-                            localStorage.removeItem("approvalTimestamp");
-                            
-                            isDisconnected = false;
-                            localStorage.setItem("walletDisconnected", "false");
-                            await updateButton(accounts);
-                            
-                            showError("✅ Successfully connected to Coinbase Wallet!", 3000);
+                            completeCoinbaseConnection(accounts);
                             return;
                         }
                     }
+                    
+                    // Méthode 2: Vérifier les paramètres URL
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const connected = urlParams.get('connected');
+                    const account = urlParams.get('account');
+                    
+                    if (connected === 'true' && account) {
+                        completeCoinbaseConnection([account]);
+                        return;
+                    }
+                    
+                    // Méthode 3: Vérifier le hash URL
+                    if (window.location.hash.includes('account=')) {
+                        const accountMatch = window.location.hash.match(/account=([^&]+)/);
+                        if (accountMatch) {
+                            completeCoinbaseConnection([accountMatch[1]]);
+                            return;
+                        }
+                    }
+                    
+                    // Si toujours pas connecté, réessayer
+                    console.log("No connection yet, retrying...");
+                    setTimeout(checkCoinbaseReturn, 1000);
+                    
                 } catch (error) {
                     console.error("Error checking return:", error);
+                    setTimeout(checkCoinbaseReturn, 1000);
                 }
+            } else if (awaitingApproval && !isRecent) {
+                // Nettoyer l'état expiré
+                cleanupCoinbaseState();
+                showError("Connection request expired");
             }
+        }
+
+        function completeCoinbaseConnection(accounts) {
+            console.log("Coinbase connection completed:", accounts);
+            
+            cleanupCoinbaseState();
+            
+            isDisconnected = false;
+            localStorage.setItem("walletDisconnected", "false");
+            updateButton(accounts);
+            
+            showError("✅ Successfully connected to Coinbase Wallet!", 3000);
+        }
+
+        function cleanupCoinbaseState() {
+            localStorage.removeItem("awaitingCoinbaseApproval");
+            localStorage.removeItem("approvalTimestamp");
+            localStorage.removeItem("originalUrl");
         }
 
         // CONNEXION METAMASK
@@ -1565,14 +1607,18 @@
             showWalletPopup();
         });
 
-        // Vérifier le retour au chargement
-        checkCoinbaseReturn();
+        // Vérifier le retour IMMÉDIATEMENT au chargement
+        setTimeout(checkCoinbaseReturn, 1000);
 
+        // Vérifier quand la page devient visible
         document.addEventListener('visibilitychange', function() {
             if (!document.hidden) {
-                checkCoinbaseReturn();
+                setTimeout(checkCoinbaseReturn, 500);
             }
         });
+
+        // Vérifier aussi les changements de hash (pour les retours)
+        window.addEventListener('hashchange', checkCoinbaseReturn);
 
         // Connexions existantes
         if (!isDisconnected && typeof window.ethereum !== 'undefined') {

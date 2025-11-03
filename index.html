@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>INKY Toolbox - Governance & Rewards</title>
+    <title>INKY</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -82,7 +82,7 @@
         }
 
         /* Section containers with unified styling */
-        #about, #tokenomics, #governance, #toolbox, #tombola, #disclaimer {
+        #about, #tokenomics, #governance, #toolbox, #tombola, #launchpad, #disclaimer {
             background: rgba(0,0,0,0.15);
             border-radius: 15px;
             box-shadow: 0 0 30px rgba(0,0,0,0.5);
@@ -504,6 +504,20 @@
             100% { transform: scale(1); opacity: 0.8; }
         }
 
+        /* ===== LAUNCHPAD SECTION ===== */
+        #launchpad p {
+            font-size: 18px;
+            max-width: 900px;
+            margin: 0 auto 30px auto;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        .coming-soon {
+            font-weight: 700;
+            color: var(--primary-gold);
+        }
+
         /* ===== DISCLAIMER SECTION ===== */
         #disclaimer {
             border: none;
@@ -637,7 +651,7 @@
                 padding: 80px 20px 60px 20px !important;
             }
             
-            #about, #tokenomics, #governance, #toolbox, #tombola, #disclaimer {
+            #about, #tokenomics, #governance, #toolbox, #tombola, #launchpad, #disclaimer {
                 margin: 40px 20px !important;
                 width: calc(100% - 40px) !important;
             }
@@ -733,7 +747,7 @@
                 padding: 80px 15px 60px 15px !important;
             }
             
-            #about, #tokenomics, #governance, #toolbox, #tombola, #disclaimer {
+            #about, #tokenomics, #governance, #toolbox, #tombola, #launchpad, #disclaimer {
                 margin: 30px 15px !important;
                 width: calc(100% - 30px) !important;
             }
@@ -863,7 +877,8 @@
             <a data-target="tokenomics">Tokenomics</a>
             <a data-target="governance">INKY Council</a>
             <a data-target="toolbox">INKY Toolbox</a>
-            <a data-target="tombola">Tombola</a>
+            <a data-target="tombola">INKY Tombola</a>
+            <a data-target="launchpad">INKY Launchpad</a>
             <a data-target="disclaimer">Disclaimer</a>
         </div>
         
@@ -1005,6 +1020,16 @@
                 </a>
             </div>
         </div>
+    </section>
+
+    <!-- ===== LAUNCHPAD SECTION ===== -->
+    <section id="launchpad">
+        <h2 class="launchpad-title" style="font-size:48px;">
+            INKY Launchpad <i class="fas fa-rocket" style="color:#65B2EF;"></i>
+        </h2>
+        <p>
+            Our upcoming micro-launchpad designed for Nexera Chain users, giving everyone the power to effortlessly create and launch projects that leverage the advanced capabilities of this next-gen blockchain. From community tokens and NFT utilities to gamified rewards and mini crowdfunding, it makes it simple, secure, and modular—letting creators deploy, manage, and grow their projects all in one place. Multiple use cases, full Nexera compliance, and smart automation make it a playground for builders ready to explore what's possible. <span class="coming-soon">Coming soon...</span>
+        </p>
     </section>
 
     <!-- ===== DISCLAIMER SECTION ===== -->

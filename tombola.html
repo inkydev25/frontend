@@ -1357,18 +1357,7 @@
     <img src="NXRA-logo.png" class="floating-logo" style="top:70%;left:80%; animation-delay:6.5s;">
     <img src="inky-logo.png" class="floating-logo" style="top:70%;left:6%; animation-delay:8s;">
 
-    <!-- External libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@coinbase/wallet-sdk@4.3.0/dist/index.js"></script>
-
-    <!-- Main application script -->
-<script src="https://cdn.jsdelivr.net/npm/@coinbase/wallet-sdk@4.3.0/dist/index.js"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/@coinbase/wallet-sdk@4.3.0/dist/index.js"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/@coinbase/wallet-sdk@4.3.0/dist/index.js"></script>
-
-<script src="https://cdn.jsdelivr.net/npm/@coinbase/wallet-sdk@4.3.0/dist/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/walletlink@2.6.0/dist/walletlink.min.js"></script>
 
 <script>
     document.addEventListener('DOMContentLoaded', async () => {
@@ -1377,27 +1366,27 @@
         const overlay = document.getElementById('popupOverlay');
         let lastAccount = null;
         let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
-        let coinbaseWallet = null;
+        let walletLink = null;
 
-        // INITIALISATION CORRECTE DU SDK COINBASE
-        function initializeCoinbaseWallet() {
+        // INITIALISATION WALLETLINK (la vraie solution)
+        function initializeWalletLink() {
             try {
-                if (typeof window.CoinbaseWalletSDK === 'undefined') {
-                    console.error('Coinbase Wallet SDK not loaded');
+                if (typeof WalletLink === 'undefined') {
+                    console.error('WalletLink not loaded');
                     return null;
                 }
 
-                coinbaseWallet = new window.CoinbaseWalletSDK({
+                walletLink = new WalletLink({
                     appName: "INKY Tombola",
-                    appLogoUrl: window.location.origin + "/inky-logo.png",
+                    appLogoUrl: "https://yourdomain.com/inky-logo.png", // REMPLACEZ!
                     darkMode: false
                 });
 
-                console.log("Coinbase Wallet SDK initialized");
-                return coinbaseWallet;
+                console.log("WalletLink initialized successfully");
+                return walletLink;
 
             } catch (error) {
-                console.error('Failed to initialize Coinbase Wallet:', error);
+                console.error('Failed to initialize WalletLink:', error);
                 return null;
             }
         }
@@ -1431,6 +1420,7 @@
             
             if (typeof window.ethereum === 'undefined') return wallets;
 
+            // Détection Coinbase Wallet
             if (window.ethereum.isCoinbaseWallet) {
                 wallets.push({
                     name: "Coinbase Wallet",
@@ -1441,6 +1431,7 @@
                 });
             }
 
+            // Détection MetaMask
             if (window.ethereum.isMetaMask) {
                 wallets.push({
                     name: "MetaMask",
@@ -1451,6 +1442,7 @@
                 });
             }
 
+            // Multiple providers
             if (window.ethereum.providers) {
                 window.ethereum.providers.forEach(provider => {
                     if (provider.isCoinbaseWallet && !wallets.some(w => w.id === "coinbase")) {
@@ -1494,26 +1486,26 @@
         // CONNEXION COINBASE WALLET AVEC WALLETLINK
         async function connectCoinbaseWallet() {
             try {
-                console.log("Starting Coinbase Wallet connection...");
+                console.log("Starting Coinbase Wallet connection with WalletLink...");
 
-                // Initialiser le SDK si pas déjà fait
-                if (!coinbaseWallet) {
-                    coinbaseWallet = initializeCoinbaseWallet();
-                    if (!coinbaseWallet) {
-                        throw new Error("Coinbase Wallet SDK not available");
+                // Initialiser WalletLink si pas déjà fait
+                if (!walletLink) {
+                    walletLink = initializeWalletLink();
+                    if (!walletLink) {
+                        throw new Error("WalletLink not available");
                     }
                 }
 
-                // Créer le provider WalletLink
-                const provider = coinbaseWallet.makeWeb3Provider();
+                // Créer le provider Ethereum
+                const ethereum = walletLink.makeWeb3Provider('https://mainnet.infura.io/v3/your-infura-key', 1);
 
-                // Démarrer la connexion - CETTE LIGNE DÉCLENCHE L'APPROVAL
-                console.log("Requesting accounts...");
-                const accounts = await provider.request({
+                // DÉCLENCHER LA CONNEXION - CETTE LIGNE MONTRE L'APPROVAL
+                console.log("Requesting accounts from WalletLink...");
+                const accounts = await ethereum.request({
                     method: 'eth_requestAccounts'
                 });
 
-                console.log("Connection successful, accounts:", accounts);
+                console.log("WalletLink connection successful, accounts:", accounts);
 
                 if (accounts && accounts.length > 0) {
                     isDisconnected = false;
@@ -1521,6 +1513,8 @@
                     await updateButton(accounts);
                     showError("✅ Successfully connected to Coinbase Wallet!", 3000);
                     return true;
+                } else {
+                    throw new Error("No accounts received");
                 }
 
             } catch (error) {
@@ -1528,10 +1522,10 @@
                 
                 if (error.code === 4001) {
                     showError("Connection rejected by user");
-                } else if (error.message?.includes('handshake')) {
+                } else if (error.message?.includes('handshake') || error.message?.includes('timeout')) {
                     showError("Connection timeout. Please try again.");
                 } else {
-                    showError("Failed to connect to Coinbase Wallet");
+                    showError("Failed to connect to Coinbase Wallet: " + error.message);
                 }
                 
                 return false;
@@ -1647,8 +1641,8 @@
             showWalletPopup();
         });
 
-        // Initialiser Coinbase Wallet au chargement
-        initializeCoinbaseWallet();
+        // Initialiser WalletLink au chargement
+        initializeWalletLink();
 
         // Vérifier les connexions existantes
         if (!isDisconnected && typeof window.ethereum !== 'undefined') {

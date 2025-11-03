@@ -1368,11 +1368,29 @@
         let lastAccount = null;
         let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
 
+        // Détection simple
         function detectWallets() {
-            return [
-                { name: "Coinbase Wallet", id: "coinbase" },
-                { name: "MetaMask", id: "metamask" }
-            ];
+            const wallets = [];
+            
+            // MetaMask - ça marche toujours
+            wallets.push({
+                name: "MetaMask",
+                id: "metamask",
+                connector: "metamask"
+            });
+
+            // Coinbase Wallet - seulement si détecté
+            if (typeof window.ethereum !== 'undefined' && 
+                (window.ethereum.isCoinbaseWallet || 
+                 (window.ethereum.providers && window.ethereum.providers.some(p => p.isCoinbaseWallet)))) {
+                wallets.push({
+                    name: "Coinbase Wallet", 
+                    id: "coinbase",
+                    connector: "coinbase"
+                });
+            }
+
+            return wallets;
         }
 
         async function updateButton(accounts) {
@@ -1389,174 +1407,52 @@
             }
         }
 
-        // SOLUTION REBELLE - CONTOURNEMENT COINBASE
+        // CONNEXION COINBASE WALLET - SIMPLE ET PROPRE
         async function connectCoinbaseWallet() {
             try {
-                // APPROCHE 1: Essayer d'abord le provider direct
-                if (typeof window.ethereum !== 'undefined') {
-                    let provider = window.ethereum;
-                    
-                    // Chercher Coinbase Wallet spécifiquement
-                    if (window.ethereum.providers) {
-                        const coinbaseProvider = window.ethereum.providers.find(p => p.isCoinbaseWallet);
-                        if (coinbaseProvider) {
-                            provider = coinbaseProvider;
-                        }
-                    }
+                console.log("Attempting Coinbase Wallet connection...");
 
-                    console.log("Trying direct provider connection...");
-                    const accounts = await provider.request({
-                        method: 'eth_requestAccounts'
-                    });
+                let provider;
 
-                    if (accounts && accounts.length > 0) {
-                        isDisconnected = false;
-                        localStorage.setItem("walletDisconnected", "false");
-                        await updateButton(accounts);
-                        showError("✅ Successfully connected to Coinbase Wallet!", 3000);
-                        return true;
-                    }
+                // Trouver le provider Coinbase
+                if (window.ethereum.isCoinbaseWallet) {
+                    provider = window.ethereum;
+                } else if (window.ethereum.providers) {
+                    provider = window.ethereum.providers.find(p => p.isCoinbaseWallet);
                 }
 
-                // APPROCHE 2: Si le provider direct échoue, utiliser WalletConnect
-                console.log("Direct connection failed, trying WalletConnect...");
-                
-                // Créer un modal WalletConnect manuel
-                showWalletConnectModal();
-                
+                if (!provider) {
+                    showError("Coinbase Wallet not detected");
+                    return false;
+                }
+
+                // Utiliser le provider directement
+                const accounts = await provider.request({
+                    method: 'eth_requestAccounts'
+                });
+
+                if (accounts && accounts.length > 0) {
+                    isDisconnected = false;
+                    localStorage.setItem("walletDisconnected", "false");
+                    await updateButton(accounts);
+                    showError("✅ Connected to Coinbase Wallet!", 3000);
+                    return true;
+                }
+
             } catch (error) {
-                console.error("Coinbase Wallet connection error:", error);
+                console.error("Coinbase Wallet error:", error);
                 
                 if (error.code === 4001) {
-                    showError("Connection rejected by user");
+                    showError("Connection rejected");
                 } else {
-                    // Montrer les options alternatives
-                    showAlternativeOptions();
+                    showError("Coinbase Wallet not available on this domain");
                 }
+                
+                return false;
             }
         }
 
-        // MODAL WALLETCONNECT PERSONNALISÉ
-        function showWalletConnectModal() {
-            const modal = document.createElement('div');
-            modal.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.8);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                z-index: 10000;
-            `;
-            
-            modal.innerHTML = `
-                <div style="background: #2E3A46; padding: 20px; border-radius: 15px; text-align: center; max-width: 300px;">
-                    <h3 style="color: #E5C07B; margin-bottom: 15px;">Connect Coinbase Wallet</h3>
-                    <p style="color: white; margin-bottom: 20px;">GitHub Pages is blocked by Coinbase. Please use one of these methods:</p>
-                    
-                    <button onclick="openCoinbaseDirect()" style="background: #0052FF; color: white; border: none; padding: 12px 20px; border-radius: 10px; margin: 5px; width: 100%; cursor: pointer;">
-                        📱 Open Coinbase Wallet App
-                    </button>
-                    
-                    <button onclick="copyWalletConnectUrl()" style="background: #3B99FC; color: white; border: none; padding: 12px 20px; border-radius: 10px; margin: 5px; width: 100%; cursor: pointer;">
-                        🔗 Copy WalletConnect URL
-                    </button>
-                    
-                    <button onclick="closeModal()" style="background: #6C7A89; color: white; border: none; padding: 10px 20px; border-radius: 10px; margin: 5px; width: 100%; cursor: pointer;">
-                        Cancel
-                    </button>
-                </div>
-            `;
-            
-            document.body.appendChild(modal);
-
-            // Fonctions globales pour les boutons
-            window.openCoinbaseDirect = function() {
-                const deeplink = `https://go.cb-w.com/dapp?url=${encodeURIComponent(window.location.href)}`;
-                window.location.href = deeplink;
-                closeModal();
-            };
-
-            window.copyWalletConnectUrl = function() {
-                const wcUrl = `https://walletconnect.com/wc?uri=your-walletconnect-uri&relay-protocol=irn&symKey=your-sym-key`;
-                navigator.clipboard.writeText(wcUrl).then(() => {
-                    showError("WalletConnect URL copied to clipboard!");
-                });
-                closeModal();
-            };
-
-            window.closeModal = function() {
-                document.body.removeChild(modal);
-            };
-        }
-
-        // OPTIONS ALTERNATIVES
-        function showAlternativeOptions() {
-            const modal = document.createElement('div');
-            modal.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.8);
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                z-index: 10000;
-            `;
-            
-            modal.innerHTML = `
-                <div style="background: #2E3A46; padding: 20px; border-radius: 15px; text-align: center; max-width: 350px;">
-                    <h3 style="color: #E5C07B; margin-bottom: 15px;">Alternative Connection Methods</h3>
-                    <p style="color: white; margin-bottom: 20px;">Coinbase blocks GitHub Pages. Try these:</p>
-                    
-                    <div style="display: flex; flex-direction: column; gap: 10px;">
-                        <button onclick="deployToNetlify()" style="background: #00C7B7; color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer;">
-                            🚀 Deploy to Netlify (Free)
-                        </button>
-                        
-                        <button onclick="useDifferentWallet()" style="background: #F6851B; color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer;">
-                            🦊 Use MetaMask Instead
-                        </button>
-                        
-                        <button onclick="testLocally()" style="background: #6C7A89; color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer;">
-                            💻 Test on Local Network
-                        </button>
-                    </div>
-                    
-                    <button onclick="closeAltModal()" style="background: transparent; color: #E5C07B; border: 1px solid #E5C07B; padding: 10px; border-radius: 10px; margin-top: 15px; width: 100%; cursor: pointer;">
-                        Close
-                    </button>
-                </div>
-            `;
-            
-            document.body.appendChild(modal);
-
-            window.deployToNetlify = function() {
-                window.open('https://app.netlify.com/start', '_blank');
-                closeAltModal();
-            };
-
-            window.useDifferentWallet = function() {
-                connectMetaMask();
-                closeAltModal();
-            };
-
-            window.testLocally = function() {
-                showError("Run: npx serve . -p 3000 --ssl");
-                closeAltModal();
-            };
-
-            window.closeAltModal = function() {
-                document.body.removeChild(modal);
-            };
-        }
-
-        // CONNEXION METAMASK
+        // CONNEXION METAMASK - ÇA MARCHE TOUJOURS
         async function connectMetaMask() {
             try {
                 let provider;
@@ -1570,14 +1466,14 @@
                 }
 
                 if (!provider) {
-                    // Deep linking mobile
+                    // Sur mobile, rediriger vers MetaMask
                     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                     if (isMobile) {
                         window.location.href = `https://metamask.app.link/dapp/${window.location.hostname}${window.location.pathname}`;
                         return;
-                    } else {
-                        throw new Error("MetaMask not detected");
                     }
+                    showError("Install MetaMask");
+                    return false;
                 }
 
                 const accounts = await provider.request({
@@ -1588,13 +1484,13 @@
                     isDisconnected = false;
                     localStorage.setItem("walletDisconnected", "false");
                     await updateButton(accounts);
-                    showError("✅ Successfully connected to MetaMask!", 3000);
+                    showError("✅ Connected to MetaMask!", 3000);
                     return true;
                 }
 
             } catch (error) {
-                console.error("MetaMask connection failed:", error);
-                showError("Failed to connect to MetaMask");
+                console.error("MetaMask error:", error);
+                showError("Failed to connect");
                 return false;
             }
         }
@@ -1604,6 +1500,11 @@
             
             const availableWallets = detectWallets();
             
+            if (availableWallets.length === 0) {
+                showError("No wallets detected. Install MetaMask.");
+                return;
+            }
+
             availableWallets.forEach(wallet => {
                 const btn = document.createElement('button');
                 btn.textContent = wallet.name;
@@ -1612,9 +1513,9 @@
                 btn.addEventListener('click', async () => {
                     hideWalletPopup();
                     
-                    if (wallet.id === "coinbase") {
+                    if (wallet.connector === "coinbase") {
                         await connectCoinbaseWallet();
-                    } else if (wallet.id === "metamask") {
+                    } else if (wallet.connector === "metamask") {
                         await connectMetaMask();
                     }
                 });
@@ -1663,7 +1564,7 @@
             showWalletPopup();
         });
 
-        // Connexions existantes
+        // Vérifier les connexions existantes
         if (!isDisconnected && typeof window.ethereum !== 'undefined') {
             try {
                 const accounts = await window.ethereum.request({ method: 'eth_accounts' });
@@ -1671,7 +1572,7 @@
                     await updateButton(accounts);
                 }
             } catch (err) {
-                console.error("Error checking existing accounts:", err);
+                console.error("Error checking accounts:", err);
             }
         }
 

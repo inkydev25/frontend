@@ -1357,231 +1357,232 @@
     <img src="NXRA-logo.png" class="floating-logo" style="top:70%;left:80%; animation-delay:6.5s;">
     <img src="inky-logo.png" class="floating-logo" style="top:70%;left:6%; animation-delay:8s;">
 
-<script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
-<script src="https://unpkg.com/@coinbase/wallet-sdk@4.3.0/dist/index.js"></script>
+    <!-- External libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+    <script type="module">
+        import { createWeb3Modal, defaultConfig } from 'https://unpkg.com/@web3modal/ethers@4.1.1/dist/index.mjs';
+        window.Web3Modal = { createWeb3Modal, defaultConfig };
+    </script>
 
-<script>
-    document.addEventListener('DOMContentLoaded', async () => {
-        const button = document.getElementById('connectButton');
-        const popup = document.getElementById('walletPopup');
-        const overlay = document.getElementById('popupOverlay');
-        let lastAccount = null;
-        let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
+    <!-- Main application script -->
+    <script>
+document.addEventListener('DOMContentLoaded', () => {
 
-        // Détection simple
-        function detectWallets() {
-            const wallets = [];
-            
-            // MetaMask - ça marche toujours
-            wallets.push({
-                name: "MetaMask",
-                id: "metamask",
-                connector: "metamask"
-            });
+    // =================================================================
+    // 1. CONFIGURATION ET INITIALISATION DE WEB3MODAL
+    // =================================================================
 
-            // Coinbase Wallet - seulement si détecté
-            if (typeof window.ethereum !== 'undefined' && 
-                (window.ethereum.isCoinbaseWallet || 
-                 (window.ethereum.providers && window.ethereum.providers.some(p => p.isCoinbaseWallet)))) {
-                wallets.push({
-                    name: "Coinbase Wallet", 
-                    id: "coinbase",
-                    connector: "coinbase"
-                });
-            }
+    // !!! IMPORTANT !!! Remplacez 'VOTRE_PROJECT_ID' par votre ID WalletConnect.
+    const projectId = 'VOTRE_PROJECT_ID'; 
 
-            return wallets;
-        }
+    // Configuration des chaînes EVM que vous supportez
+    const ethereumMainnet = {
+        chainId: 1,
+        name: 'Ethereum',
+        currency: 'ETH',
+        explorerUrl: 'https://etherscan.io',
+        rpcUrl: 'https://cloudflare-eth.com'
+    };
 
-        async function updateButton(accounts) {
-            if (isDisconnected) accounts = [];
-            const account = accounts.length > 0 ? accounts[0] : null;
-            lastAccount = account;
+    const polygonMumbai = { // Exemple d'une autre chaîne que vous pourriez vouloir supporter
+        chainId: 80001,
+        name: 'Polygon Mumbai',
+        currency: 'MATIC',
+        explorerUrl: 'https://mumbai.polygonscan.com',
+        rpcUrl: 'https://rpc-mumbai.maticvigil.com'
+    };
+    
+    const chains = [ethereumMainnet, polygonMumbai];
 
-            if (account) {
-                button.textContent = `Connected: ${account.substring(0, 6)}...${account.slice(-4)}`;
-                button.classList.add('connected');
-            } else {
-                button.textContent = 'Connect your wallet';
-                button.classList.remove('connected');
-            }
-        }
+    // Métadonnées de l'application (affichées dans le wallet lors de la connexion)
+    const metadata = {
+        name: 'INKY Tombola',
+        description: 'Votre application de Tombola décentralisée',
+        url: window.location.origin, 
+        icons: ['https://votre-site.com/icon.png'] // Remplacez par votre icône
+    };
 
-        // CONNEXION COINBASE WALLET - SIMPLE ET PROPRE
-        async function connectCoinbaseWallet() {
-            try {
-                console.log("Attempting Coinbase Wallet connection...");
-
-                let provider;
-
-                // Trouver le provider Coinbase
-                if (window.ethereum.isCoinbaseWallet) {
-                    provider = window.ethereum;
-                } else if (window.ethereum.providers) {
-                    provider = window.ethereum.providers.find(p => p.isCoinbaseWallet);
-                }
-
-                if (!provider) {
-                    showError("Coinbase Wallet not detected");
-                    return false;
-                }
-
-                // Utiliser le provider directement
-                const accounts = await provider.request({
-                    method: 'eth_requestAccounts'
-                });
-
-                if (accounts && accounts.length > 0) {
-                    isDisconnected = false;
-                    localStorage.setItem("walletDisconnected", "false");
-                    await updateButton(accounts);
-                    showError("✅ Connected to Coinbase Wallet!", 3000);
-                    return true;
-                }
-
-            } catch (error) {
-                console.error("Coinbase Wallet error:", error);
-                
-                if (error.code === 4001) {
-                    showError("Connection rejected");
-                } else {
-                    showError("Coinbase Wallet not available on this domain");
-                }
-                
-                return false;
-            }
-        }
-
-        // CONNEXION METAMASK - ÇA MARCHE TOUJOURS
-        async function connectMetaMask() {
-            try {
-                let provider;
-
-                if (typeof window.ethereum !== 'undefined') {
-                    if (window.ethereum.isMetaMask) {
-                        provider = window.ethereum;
-                    } else if (window.ethereum.providers) {
-                        provider = window.ethereum.providers.find(p => p.isMetaMask);
-                    }
-                }
-
-                if (!provider) {
-                    // Sur mobile, rediriger vers MetaMask
-                    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                    if (isMobile) {
-                        window.location.href = `https://metamask.app.link/dapp/${window.location.hostname}${window.location.pathname}`;
-                        return;
-                    }
-                    showError("Install MetaMask");
-                    return false;
-                }
-
-                const accounts = await provider.request({
-                    method: 'eth_requestAccounts'
-                });
-
-                if (accounts && accounts.length > 0) {
-                    isDisconnected = false;
-                    localStorage.setItem("walletDisconnected", "false");
-                    await updateButton(accounts);
-                    showError("✅ Connected to MetaMask!", 3000);
-                    return true;
-                }
-
-            } catch (error) {
-                console.error("MetaMask error:", error);
-                showError("Failed to connect");
-                return false;
-            }
-        }
-
-        function showWalletPopup() {
-            popup.innerHTML = '';
-            
-            const availableWallets = detectWallets();
-            
-            if (availableWallets.length === 0) {
-                showError("No wallets detected. Install MetaMask.");
-                return;
-            }
-
-            availableWallets.forEach(wallet => {
-                const btn = document.createElement('button');
-                btn.textContent = wallet.name;
-                btn.className = 'wallet-button';
-                
-                btn.addEventListener('click', async () => {
-                    hideWalletPopup();
-                    
-                    if (wallet.connector === "coinbase") {
-                        await connectCoinbaseWallet();
-                    } else if (wallet.connector === "metamask") {
-                        await connectMetaMask();
-                    }
-                });
-                
-                popup.appendChild(btn);
-            });
-
-            overlay.style.display = 'block';
-            popup.style.display = 'block';
-        }
-
-        function hideWalletPopup() {
-            popup.style.display = 'none';
-            overlay.style.display = 'none';
-        }
-
-        function showError(message, duration = 4000) {
-            const errorPopup = document.getElementById("errorPopup");
-            if (!errorPopup) return;
-            
-            errorPopup.textContent = message;
-            errorPopup.style.display = "block";
-            errorPopup.style.opacity = 1;
-            
-            setTimeout(() => {
-                errorPopup.style.transition = "opacity 0.5s";
-                errorPopup.style.opacity = 0;
-                setTimeout(() => {
-                    errorPopup.style.display = "none";
-                    errorPopup.style.transition = "";
-                }, 500);
-            }, duration);
-        }
-
-        // EVENT LISTENERS
-        overlay.addEventListener('click', hideWalletPopup);
-
-        button.addEventListener('click', () => {
-            if (lastAccount) {
-                lastAccount = null;
-                isDisconnected = true;
-                localStorage.setItem("walletDisconnected", "true");
-                updateButton([]);
-                return;
-            }
-            showWalletPopup();
+    // Création de la configuration Ethers (nécessite ethers.js V6)
+    const ethersConfig = window.Web3Modal.defaultConfig({
+        metadata,
+        enableEIP6963: true,  // Détection des wallets installés localement
+        enableInjected: true, // Support MetaMask desktop
+        enableCoinbase: true, // Support natif Coinbase Wallet
+    });
+    
+    // Initialisation de Web3Modal (crée le modal que l'utilisateur voit)
+    let web3Modal = null;
+    try {
+        web3Modal = window.Web3Modal.createWeb3Modal({
+            ethersConfig,
+            chains,
+            projectId,
+            defaultChain: ethereumMainnet,
+            themeMode: 'dark', 
         });
+    } catch (e) {
+        console.error("Erreur lors de l'initialisation de Web3Modal.", e);
+        return;
+    }
 
-        // Vérifier les connexions existantes
-        if (!isDisconnected && typeof window.ethereum !== 'undefined') {
-            try {
-                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-                if (accounts.length > 0) {
-                    await updateButton(accounts);
-                }
-            } catch (err) {
-                console.error("Error checking accounts:", err);
-            }
+
+    // =================================================================
+    // 2. GESTION DU DOM ET VARIABLES
+    // =================================================================
+    
+    const connectButton = document.getElementById('connect-button'); 
+    let provider = null;
+    let signer = null;
+    let currentAccount = null;
+
+    if (!connectButton) {
+        console.error("Le bouton de connexion (id='connect-button') est introuvable. Veuillez vérifier votre HTML.");
+        return;
+    }
+
+    // =================================================================
+    // 3. FONCTIONS DE GESTION DU WALLET
+    // =================================================================
+
+    /**
+     * Met à jour le texte du bouton avec l'état de la connexion.
+     * @param {string | null} address L'adresse de l'utilisateur ou null.
+     */
+    function updateConnectButton(address) {
+        if (address) {
+            currentAccount = address;
+            // Affiche l'adresse tronquée (ex: 0x1234...ABCD)
+            const displayAddress = `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+            connectButton.textContent = displayAddress;
+            // Optionnel: Mettre à jour l'état visuel (ex: ajouter une classe CSS)
+            // connectButton.classList.add('connected');
+        } else {
+            currentAccount = null;
+            connectButton.textContent = 'Connect your wallet';
+            // connectButton.classList.remove('connected');
         }
+        
+        // --- LOGIQUE TOMBOLA ---
+        // C'est ici que vous réintégrerez vos fonctions Tombola liées à la connexion:
+        // Ex: updateStats(currentAccount ? roundId : null);
+    }
 
-        if (typeof window.ethereum !== 'undefined') {
-            window.ethereum.on('accountsChanged', updateButton);
+    /**
+     * Ouvre le Web3Modal pour initialiser la connexion.
+     */
+    async function connectWallet() {
+        try {
+            // Web3Modal gère tout : l'UI, la sélection de wallet, et la redirection mobile.
+            const walletProvider = await web3Modal.open(); 
+            
+            // Création du Provider et du Signer ethers v6
+            provider = new ethers.BrowserProvider(walletProvider);
+            signer = await provider.getSigner();
+            
+            const address = await signer.getAddress();
+            updateConnectButton(address);
+            
+            console.log("Wallet connecté:", address);
+
+        } catch (error) {
+            // L'utilisateur a annulé le modal ou la connexion a échoué.
+            console.error("Erreur de connexion ou annulation par l'utilisateur.", error);
+            // On s'assure que l'état est bien déconnecté
+            disconnectWallet(false); // Pas besoin d'appeler web3Modal.disconnect() ici
+        }
+    }
+
+    /**
+     * Gère la déconnexion du portefeuille.
+     * @param {boolean} callModalDisconnect Indique si web3Modal.disconnect() doit être appelé.
+     */
+    function disconnectWallet(callModalDisconnect = true) {
+        if (callModalDisconnect) {
+            web3Modal.disconnect(); 
+        }
+        provider = null;
+        signer = null;
+        updateConnectButton(null);
+        console.log("Wallet déconnecté.");
+
+        // --- LOGIQUE TOMBOLA ---
+        // C'est ici que vous réintégrerez vos fonctions Tombola liées à la déconnexion:
+        // Ex: resetAppData(); 
+    }
+
+    /**
+     * Écoute les événements du Web3Modal pour gérer le changement de compte/chaîne.
+     */
+    function setupWeb3ModalListeners() {
+        // Écouter les événements pour maintenir l'état à jour
+        web3Modal.subscribeEvents(async (event) => {
+            console.log("Web3Modal Event:", event.data.name);
+
+            // Cas de changement de compte ou de chaîne
+            if (event.data.name === 'w3m_session_update') {
+                if (web3Modal.getWalletProvider()) {
+                    const walletProvider = web3Modal.getWalletProvider();
+                    provider = new ethers.BrowserProvider(walletProvider);
+                    signer = await provider.getSigner();
+                    updateConnectButton(await signer.getAddress());
+                } else {
+                    disconnectWallet();
+                }
+            }
+            
+            // Cas de déconnexion explicite (depuis le modal ou le wallet)
+            if (event.data.name === 'w3m_session_delete') {
+                disconnectWallet(false); // Pas besoin de rappeler web3Modal.disconnect()
+            }
+        });
+    }
+
+
+    // =================================================================
+    // 4. GESTION DES ÉVÉNEMENTS & INITIALISATION
+    // =================================================================
+
+    // Logique du bouton "Connecter/Déconnecter"
+    connectButton.addEventListener('click', () => {
+        if (currentAccount) {
+            // Si déjà connecté, on déconnecte
+            disconnectWallet();
+        } else {
+            // Sinon, on connecte (ouvre le modal)
+            connectWallet();
         }
     });
-</script>
 
+    /**
+     * Tente de reconnecter automatiquement au chargement de la page.
+     */
+    async function checkAutoConnect() {
+        // Web3Modal gère la persistance de session (localStorage), il suffit d'écouter
+        // l'état du provider après un petit délai de restauration.
+        setTimeout(async () => {
+            if (web3Modal.getWalletProvider()) {
+                try {
+                    const walletProvider = web3Modal.getWalletProvider();
+                    provider = new ethers.BrowserProvider(walletProvider);
+                    signer = await provider.getSigner();
+                    const address = await signer.getAddress();
+                    updateConnectButton(address);
+                    console.log("Reconnexion automatique réussie:", address);
+                } catch (e) {
+                    console.error("Échec de la reconnexion automatique", e);
+                    disconnectWallet();
+                }
+            } else {
+                updateConnectButton(null);
+            }
+        }, 500); 
+    }
+
+    // Démarrer l'application
+    setupWeb3ModalListeners();
+    checkAutoConnect(); 
+});
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
 </html>

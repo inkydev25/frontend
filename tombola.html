@@ -1363,6 +1363,7 @@
     <!-- Main application script -->
 <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@coinbase/wallet-sdk@4.3.0/dist/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@metamask/sdk@0.2.1/dist/index.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', async () => {
         const button = document.getElementById('connectButton');
@@ -1370,49 +1371,116 @@
         const overlay = document.getElementById('popupOverlay');
         let lastAccount = null;
         let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
+        let metaMaskSDK = null;
+
+        // ===== INITIALISATION META MASK SDK =====
+        function initializeMetaMaskSDK() {
+            if (typeof MetaMaskSDK === 'undefined') return null;
+            
+            try {
+                const MMSDK = new MetaMaskSDK({
+                    dappMetadata: {
+                        name: "INKY Tombola",
+                        url: window.location.hostname,
+                    },
+                    infuraAPIKey: "YOUR_INFURA_KEY", // Optionnel
+                    checkInstallationImmediately: true,
+                });
+                
+                return MMSDK;
+            } catch (error) {
+                console.error('Error initializing MetaMask SDK:', error);
+                return null;
+            }
+        }
 
         // ===== WALLET DETECTION =====
         function detectWallets() {
             const wallets = [];
-            const ethereum = window.ethereum;
             
-            // MetaMask (détection standard)
-            if (ethereum && ethereum.isMetaMask) {
+            // MetaMask avec SDK
+            wallets.push({
+                id: 'metamask',
+                name: 'MetaMask',
+                type: 'sdk'
+            });
+            
+            // Rabby Wallet (utilise l'injected standard)
+            if (window.ethereum && window.ethereum.isRabby) {
                 wallets.push({
-                    id: 'metamask',
-                    name: 'MetaMask',
-                    provider: ethereum,
-                    type: 'injected'
+                    id: 'rabby',
+                    name: 'Rabby Wallet', 
+                    type: 'injected',
+                    provider: window.ethereum
                 });
             }
             
-            // Rabby Wallet
-            if (ethereum && ethereum.isRabby) {
-                wallets.push({
-                    id: 'rabby', 
-                    name: 'Rabby Wallet',
-                    provider: ethereum,
-                    type: 'injected'
-                });
-            }
-            
-            // Si pas de wallet détecté mais window.ethereum existe
-            if (ethereum && wallets.length === 0) {
-                wallets.push({
-                    id: 'generic',
-                    name: 'Browser Wallet',
-                    provider: ethereum,
-                    type: 'injected'
-                });
+            // MetaMask injected (fallback)
+            if (window.ethereum && window.ethereum.isMetaMask) {
+                // Éviter les doublons
+                if (!wallets.some(w => w.id === 'metamask')) {
+                    wallets.push({
+                        id: 'metamask-injected',
+                        name: 'MetaMask',
+                        type: 'injected',
+                        provider: window.ethereum
+                    });
+                }
             }
             
             return wallets;
         }
 
-        // ===== WALLET CONNECTION =====
-        async function connectWallet(provider, walletName) {
+        // ===== META MASK CONNECTION =====
+        async function connectMetaMask() {
             try {
-                // Méthode standard pour demander la connexion
+                if (!metaMaskSDK) {
+                    metaMaskSDK = initializeMetaMaskSDK();
+                }
+                
+                if (!metaMaskSDK) {
+                    throw new Error('MetaMask SDK not available');
+                }
+                
+                // Utiliser le SDK pour la connexion
+                const accounts = await metaMaskSDK.connect();
+                
+                if (accounts && accounts.length > 0) {
+                    isDisconnected = false;
+                    localStorage.setItem("walletDisconnected", "false");
+                    await updateButton(accounts);
+                    showSuccess("Connected to MetaMask!");
+                    return true;
+                }
+                
+                return false;
+                
+            } catch (error) {
+                console.error('MetaMask connection error:', error);
+                
+                // Fallback vers la méthode standard
+                if (window.ethereum) {
+                    return await connectInjectedWallet(window.ethereum, "MetaMask");
+                }
+                
+                showError("MetaMask connection failed. Please ensure MetaMask is installed.");
+                return false;
+            }
+        }
+
+        // ===== RABBY WALLET CONNECTION =====
+        async function connectRabbyWallet() {
+            if (!window.ethereum || !window.ethereum.isRabby) {
+                showError("Rabby Wallet not detected. Please install Rabby Wallet.");
+                return false;
+            }
+            
+            return await connectInjectedWallet(window.ethereum, "Rabby Wallet");
+        }
+
+        // ===== INJECTED WALLET CONNECTION =====
+        async function connectInjectedWallet(provider, walletName) {
+            try {
                 const accounts = await provider.request({
                     method: 'eth_requestAccounts'
                 });
@@ -1432,26 +1500,7 @@
                 if (error.code === 4001) {
                     showError("Connection rejected by user");
                 } else {
-                    showError(`${walletName} connection failed: ${error.message}`);
-                }
-                return false;
-            }
-        }
-
-        // ===== MOBILE WALLET HANDLING =====
-        function handleMobileWalletConnection() {
-            // Sur mobile, on utilise la même méthode que pour le desktop
-            // car MetaMask mobile injecte aussi window.ethereum
-            if (window.ethereum) {
-                return connectWallet(window.ethereum, "Wallet");
-            } else {
-                // Si aucun wallet n'est injecté, guider l'utilisateur
-                if (isMobileDevice()) {
-                    showError(
-                        "No wallet detected. Please open this page in your wallet's browser or install MetaMask/Rabby first."
-                    );
-                } else {
-                    showError("Please install a wallet extension like MetaMask or Rabby");
+                    showError(`${walletName} connection failed`);
                 }
                 return false;
             }
@@ -1472,32 +1521,32 @@
             }
         }
 
-        function isMobileDevice() {
-            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        }
-
         function showWalletPopup() {
             popup.innerHTML = '';
             const wallets = detectWallets();
             
             if (wallets.length === 0) {
-                // Aucun wallet détecté - option générique
                 const btn = document.createElement('button');
-                btn.textContent = 'Connect Wallet';
-                btn.onclick = () => {
-                    hideWalletPopup();
-                    handleMobileWalletConnection();
-                };
+                btn.textContent = 'No wallets detected';
+                btn.disabled = true;
                 popup.appendChild(btn);
             } else {
-                // Afficher les wallets détectés
                 wallets.forEach(wallet => {
                     const btn = document.createElement('button');
                     btn.textContent = wallet.name;
+                    
                     btn.onclick = async () => {
                         hideWalletPopup();
-                        await connectWallet(wallet.provider, wallet.name);
+                        
+                        if (wallet.id === 'metamask') {
+                            await connectMetaMask();
+                        } else if (wallet.id === 'rabby') {
+                            await connectRabbyWallet();
+                        } else if (wallet.type === 'injected') {
+                            await connectInjectedWallet(wallet.provider, wallet.name);
+                        }
                     };
+                    
                     popup.appendChild(btn);
                 });
             }
@@ -1512,26 +1561,53 @@
         }
 
         function showError(message) {
-            alert(message); // Simple alert pour le moment
+            const errorPopup = document.getElementById("errorPopup");
+            if (errorPopup) {
+                errorPopup.textContent = message;
+                errorPopup.style.display = "block";
+                setTimeout(() => {
+                    errorPopup.style.display = "none";
+                }, 4000);
+            } else {
+                alert(message);
+            }
         }
 
         function showSuccess(message) {
-            alert(message); // Simple alert pour le moment
+            alert(message); // Simplifié pour le moment
         }
 
         // ===== INITIALIZATION =====
         async function initialize() {
+            // Initialiser MetaMask SDK
+            metaMaskSDK = initializeMetaMaskSDK();
+            
             // Vérifier la connexion existante
-            if (!isDisconnected && window.ethereum) {
-                try {
-                    const accounts = await window.ethereum.request({ 
-                        method: 'eth_accounts' 
-                    });
-                    if (accounts.length > 0) {
-                        await updateButton(accounts);
+            if (!isDisconnected) {
+                let accounts = [];
+                
+                // Essayer d'abord avec le SDK MetaMask
+                if (metaMaskSDK) {
+                    try {
+                        accounts = await metaMaskSDK.connect();
+                    } catch (error) {
+                        console.log('MetaMask SDK connection check failed');
                     }
-                } catch (error) {
-                    console.error('Error checking existing connection:', error);
+                }
+                
+                // Fallback vers injected
+                if ((!accounts || accounts.length === 0) && window.ethereum) {
+                    try {
+                        accounts = await window.ethereum.request({ 
+                            method: 'eth_accounts' 
+                        });
+                    } catch (error) {
+                        console.error('Error checking existing connection:', error);
+                    }
+                }
+                
+                if (accounts && accounts.length > 0) {
+                    await updateButton(accounts);
                 }
             }
 

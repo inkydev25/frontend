@@ -1364,6 +1364,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@coinbase/wallet-sdk@4.3.0/dist/index.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@metamask/sdk@0.2.1/dist/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', async () => {
         const button = document.getElementById('connectButton');
@@ -1371,114 +1372,145 @@
         const overlay = document.getElementById('popupOverlay');
         let lastAccount = null;
         let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
-        let metaMaskSDK = null;
-
-        // ===== INITIALISATION META MASK SDK =====
-        function initializeMetaMaskSDK() {
-            if (typeof MetaMaskSDK === 'undefined') return null;
-            
-            try {
-                const MMSDK = new MetaMaskSDK({
-                    dappMetadata: {
-                        name: "INKY Tombola",
-                        url: window.location.hostname,
-                    },
-                    infuraAPIKey: "YOUR_INFURA_KEY", // Optionnel
-                    checkInstallationImmediately: true,
-                });
-                
-                return MMSDK;
-            } catch (error) {
-                console.error('Error initializing MetaMask SDK:', error);
-                return null;
-            }
-        }
+        let walletConnectProvider = null;
 
         // ===== WALLET DETECTION =====
         function detectWallets() {
             const wallets = [];
             
-            // MetaMask avec SDK
+            // WalletConnect - option principale pour mobile
             wallets.push({
-                id: 'metamask',
-                name: 'MetaMask',
-                type: 'sdk'
+                id: 'walletconnect',
+                name: 'WalletConnect',
+                type: 'walletconnect'
             });
             
-            // Rabby Wallet (utilise l'injected standard)
-            if (window.ethereum && window.ethereum.isRabby) {
+            // MetaMask
+            if (window.ethereum && window.ethereum.isMetaMask) {
                 wallets.push({
-                    id: 'rabby',
-                    name: 'Rabby Wallet', 
+                    id: 'metamask',
+                    name: 'MetaMask',
                     type: 'injected',
                     provider: window.ethereum
                 });
             }
             
-            // MetaMask injected (fallback)
-            if (window.ethereum && window.ethereum.isMetaMask) {
-                // Éviter les doublons
-                if (!wallets.some(w => w.id === 'metamask')) {
-                    wallets.push({
-                        id: 'metamask-injected',
-                        name: 'MetaMask',
-                        type: 'injected',
-                        provider: window.ethereum
-                    });
-                }
+            // Rabby Wallet
+            if (window.ethereum && window.ethereum.isRabby) {
+                wallets.push({
+                    id: 'rabby',
+                    name: 'Rabby Wallet',
+                    type: 'injected', 
+                    provider: window.ethereum
+                });
             }
             
             return wallets;
         }
 
-        // ===== META MASK CONNECTION =====
-        async function connectMetaMask() {
+        // ===== WALLETCONNECT POUR MOBILE =====
+        async function connectWalletConnect() {
             try {
-                if (!metaMaskSDK) {
-                    metaMaskSDK = initializeMetaMaskSDK();
-                }
+                // Configuration optimisée pour mobile
+                walletConnectProvider = new WalletConnectProvider.default({
+                    rpc: {
+                        8453: "https://mainnet.base.org" // Base network
+                    },
+                    chainId: 8453,
+                    bridge: "https://bridge.walletconnect.org",
+                    qrcodeModal: false, // IMPORTANT: Pas de QR code sur mobile
+                    qrcode: false
+                });
+
+                // Sur mobile, WalletConnect va automatiquement :
+                // 1. Détecter les apps wallet installées
+                // 2. Proposer de les ouvrir
+                // 3. Rediriger vers l'app pour approbation
+                // 4. Revenir automatiquement sur votre page après approbation
                 
-                if (!metaMaskSDK) {
-                    throw new Error('MetaMask SDK not available');
-                }
-                
-                // Utiliser le SDK pour la connexion
-                const accounts = await metaMaskSDK.connect();
+                console.log('Enabling WalletConnect...');
+                await walletConnectProvider.enable();
+
+                const accounts = walletConnectProvider.accounts;
+                console.log('WalletConnect accounts:', accounts);
                 
                 if (accounts && accounts.length > 0) {
                     isDisconnected = false;
                     localStorage.setItem("walletDisconnected", "false");
                     await updateButton(accounts);
-                    showSuccess("Connected to MetaMask!");
+                    showSuccess("Wallet connected successfully!");
+                    
+                    // Écouter les événements
+                    walletConnectProvider.on("accountsChanged", (accounts) => {
+                        updateButton(accounts);
+                    });
+                    
+                    walletConnectProvider.on("chainChanged", (chainId) => {
+                        window.location.reload();
+                    });
+                    
+                    walletConnectProvider.on("disconnect", () => {
+                        lastAccount = null;
+                        updateButton([]);
+                    });
+                    
                     return true;
                 }
                 
                 return false;
                 
             } catch (error) {
-                console.error('MetaMask connection error:', error);
+                console.error('WalletConnect error:', error);
                 
-                // Fallback vers la méthode standard
-                if (window.ethereum) {
-                    return await connectInjectedWallet(window.ethereum, "MetaMask");
+                if (error.message?.includes('User closed modal')) {
+                    showError("Connection cancelled");
+                } else if (error.message?.includes('Session rejected')) {
+                    showError("Connection rejected");
+                } else if (error.message?.includes('No matching key')) {
+                    // Essayer avec une autre configuration
+                    return await connectWalletConnectFallback();
+                } else {
+                    showError("Connection failed. Please try another wallet.");
+                }
+                return false;
+            }
+        }
+
+        // ===== FALLBACK POUR WALLETCONNECT =====
+        async function connectWalletConnectFallback() {
+            try {
+                // Configuration alternative
+                walletConnectProvider = new WalletConnectProvider.default({
+                    rpc: {
+                        1: "https://cloudflare-eth.com",
+                        8453: "https://mainnet.base.org"
+                    },
+                    chainId: 8453,
+                    bridge: "https://bridge.walletconnect.org",
+                    qrcodeModal: true // Activer le modal si nécessaire
+                });
+
+                await walletConnectProvider.enable();
+                
+                const accounts = walletConnectProvider.accounts;
+                if (accounts && accounts.length > 0) {
+                    isDisconnected = false;
+                    localStorage.setItem("walletDisconnected", "false");
+                    await updateButton(accounts);
+                    showSuccess("Connected!");
+                    return true;
                 }
                 
-                showError("MetaMask connection failed. Please ensure MetaMask is installed.");
+                return false;
+                
+            } catch (error) {
+                console.error('WalletConnect fallback error:', error);
+                showError("Please install a wallet app like MetaMask or Rabby");
                 return false;
             }
         }
 
-        // ===== RABBY WALLET CONNECTION =====
-        async function connectRabbyWallet() {
-            if (!window.ethereum || !window.ethereum.isRabby) {
-                showError("Rabby Wallet not detected. Please install Rabby Wallet.");
-                return false;
-            }
-            
-            return await connectInjectedWallet(window.ethereum, "Rabby Wallet");
-        }
-
-        // ===== INJECTED WALLET CONNECTION =====
+        // ===== CONNEXION INJECTED (Desktop) =====
         async function connectInjectedWallet(provider, walletName) {
             try {
                 const accounts = await provider.request({
@@ -1522,34 +1554,37 @@
         }
 
         function showWalletPopup() {
-            popup.innerHTML = '';
+            popup.innerHTML = '<h3 style="margin: 0 0 15px 0; text-align: center; color: var(--text-color-accent);">Choose Wallet</h3>';
             const wallets = detectWallets();
             
-            if (wallets.length === 0) {
+            wallets.forEach(wallet => {
                 const btn = document.createElement('button');
-                btn.textContent = 'No wallets detected';
-                btn.disabled = true;
+                btn.textContent = wallet.name;
+                btn.style.cssText = `
+                    width: 100%;
+                    padding: 12px;
+                    margin: 8px 0;
+                    background: linear-gradient(270deg, var(--bg-color-gradient-dark), var(--bg-color-main));
+                    border: none;
+                    border-radius: 10px;
+                    color: var(--text-color-light);
+                    font-weight: bold;
+                    cursor: pointer;
+                    transition: transform 0.2s;
+                `;
+                
+                btn.onclick = async () => {
+                    hideWalletPopup();
+                    
+                    if (wallet.type === 'walletconnect') {
+                        await connectWalletConnect();
+                    } else if (wallet.type === 'injected') {
+                        await connectInjectedWallet(wallet.provider, wallet.name);
+                    }
+                };
+                
                 popup.appendChild(btn);
-            } else {
-                wallets.forEach(wallet => {
-                    const btn = document.createElement('button');
-                    btn.textContent = wallet.name;
-                    
-                    btn.onclick = async () => {
-                        hideWalletPopup();
-                        
-                        if (wallet.id === 'metamask') {
-                            await connectMetaMask();
-                        } else if (wallet.id === 'rabby') {
-                            await connectRabbyWallet();
-                        } else if (wallet.type === 'injected') {
-                            await connectInjectedWallet(wallet.provider, wallet.name);
-                        }
-                    };
-                    
-                    popup.appendChild(btn);
-                });
-            }
+            });
             
             overlay.style.display = 'block';
             popup.style.display = 'block';
@@ -1561,57 +1596,28 @@
         }
 
         function showError(message) {
-            const errorPopup = document.getElementById("errorPopup");
-            if (errorPopup) {
-                errorPopup.textContent = message;
-                errorPopup.style.display = "block";
-                setTimeout(() => {
-                    errorPopup.style.display = "none";
-                }, 4000);
-            } else {
-                alert(message);
-            }
+            alert(`Error: ${message}`);
         }
 
         function showSuccess(message) {
-            alert(message); // Simplifié pour le moment
+            alert(`Success: ${message}`);
         }
 
         // ===== INITIALIZATION =====
         async function initialize() {
-            // Initialiser MetaMask SDK
-            metaMaskSDK = initializeMetaMaskSDK();
-            
-            // Vérifier la connexion existante
-            if (!isDisconnected) {
-                let accounts = [];
-                
-                // Essayer d'abord avec le SDK MetaMask
-                if (metaMaskSDK) {
-                    try {
-                        accounts = await metaMaskSDK.connect();
-                    } catch (error) {
-                        console.log('MetaMask SDK connection check failed');
+            if (!isDisconnected && window.ethereum) {
+                try {
+                    const accounts = await window.ethereum.request({ 
+                        method: 'eth_accounts' 
+                    });
+                    if (accounts.length > 0) {
+                        await updateButton(accounts);
                     }
-                }
-                
-                // Fallback vers injected
-                if ((!accounts || accounts.length === 0) && window.ethereum) {
-                    try {
-                        accounts = await window.ethereum.request({ 
-                            method: 'eth_accounts' 
-                        });
-                    } catch (error) {
-                        console.error('Error checking existing connection:', error);
-                    }
-                }
-                
-                if (accounts && accounts.length > 0) {
-                    await updateButton(accounts);
+                } catch (error) {
+                    console.error('Error checking existing connection:', error);
                 }
             }
 
-            // Écouter les changements
             if (window.ethereum) {
                 window.ethereum.on('accountsChanged', (accounts) => {
                     updateButton(accounts);
@@ -1622,10 +1628,15 @@
         // ===== EVENT LISTENERS =====
         button.addEventListener('click', () => {
             if (lastAccount) {
-                // Déconnexion
                 lastAccount = null;
                 isDisconnected = true;
                 localStorage.setItem("walletDisconnected", "true");
+                
+                if (walletConnectProvider) {
+                    walletConnectProvider.disconnect();
+                    walletConnectProvider = null;
+                }
+                
                 updateButton([]);
             } else {
                 showWalletPopup();

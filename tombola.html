@@ -1373,6 +1373,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let lastAccount = null;
     let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
     let provider = null;
+    let walletConnect = null;
 
     // ===== WALLET CONNECT CONFIGURATION =====
     const PROJECT_ID = "4c7776eeb4ace1f4484fb171741724ba";
@@ -1428,77 +1429,72 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, duration);
     }
 
-    // ===== WALLET CONNECTION FUNCTIONS =====
+    // ===== WALLET CONNECT REAL IMPLEMENTATION =====
 
     /**
-     * Initialise WalletConnect SANS redirection
+     * Charge la bibliothèque WalletConnect
      */
-    async function initializeWalletConnect() {
-        try {
-            console.log("Initializing WalletConnect without redirect...");
-            
-            const walletConnectProvider = {
-                isWalletConnect: true,
-                connect: async function() {
-                    return new Promise((resolve, reject) => {
-                        // Créer un WC URI valide
-                        const wcUri = generateWalletConnectURI();
-                        
-                        // URLs pour WalletConnect v2 (mais on ne les utilise pas pour la redirection)
-                        const universalLink = `https://walletconnect.com/wc?uri=${encodeURIComponent(wcUri)}`;
-                        const mobileDeepLink = `wc:${wcUri.split('wc:')[1]}`;
-                        
-                        console.log("WC URI:", wcUri);
-                        
-                        // Détection mobile
-                        const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                        
-                        if (isMobile) {
-                            // Sur mobile: ouvrir le deep link dans une nouvelle fenêtre/onglet
-                            window.open(mobileDeepLink, '_blank');
-                        } else {
-                            // Sur desktop: afficher QR code seulement
-                            showQRCodeOnly(wcUri, resolve, reject);
-                        }
-                        
-                        // Pour la démo, simuler une connexion réussie
-                        setTimeout(() => {
-                            resolve(["0x742d35Cc6634C0532925a3b8Dc9F5bD6471aD269"]);
-                        }, 3000);
-                    });
+    async function loadWalletConnectLibrary() {
+        return new Promise((resolve, reject) => {
+            if (window.WalletConnect) {
+                resolve(window.WalletConnect);
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/@walletconnect/client@1.8.0/dist/umd/index.min.js';
+            script.onload = () => {
+                if (window.WalletConnect) {
+                    resolve(window.WalletConnect);
+                } else {
+                    reject(new Error('WalletConnect library not loaded'));
                 }
             };
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
 
-            return walletConnectProvider;
+    /**
+     * Initialise la vraie connexion WalletConnect
+     */
+    async function initializeRealWalletConnect() {
+        try {
+            console.log("Initializing real WalletConnect...");
+            
+            const WalletConnect = await loadWalletConnectLibrary();
+            
+            // Créer le connector WalletConnect
+            walletConnect = new WalletConnect.default({
+                bridge: "https://bridge.walletconnect.org", // Le bridge officiel
+                qrcodeModal: {
+                    open: (uri, cb) => {
+                        showQRCodeModal(uri, cb);
+                    },
+                    close: () => {
+                        closeQRCodeModal();
+                    }
+                }
+            });
+
+            // Vérifier si une connexion existe déjà
+            if (walletConnect.connected) {
+                console.log("Already connected:", walletConnect.accounts);
+                return walletConnect.accounts;
+            }
+
+            return null;
 
         } catch (error) {
-            console.error("WalletConnect initialization failed:", error);
+            console.error("Real WalletConnect initialization failed:", error);
             throw new Error("WalletConnect not available");
         }
     }
 
     /**
-     * Génère un URI WalletConnect valide
+     * Affiche le modal QR code pour WalletConnect
      */
-    function generateWalletConnectURI() {
-        const topic = generateRandomId();
-        const symKey = generateRandomId();
-        const relayProtocol = "irn";
-        
-        return `wc:${topic}@2?relay-protocol=${relayProtocol}&symKey=${symKey}&projectId=${PROJECT_ID}`;
-    }
-
-    /**
-     * Génère un ID aléatoire
-     */
-    function generateRandomId() {
-        return Math.random().toString(36).substring(2) + Date.now().toString(36);
-    }
-
-    /**
-     * Affiche UNIQUEMENT le QR code sans lien vers walletconnect.com
-     */
-    function showQRCodeOnly(wcUri, resolve, reject) {
+    function showQRCodeModal(uri, cb) {
         const qrModal = document.createElement('div');
         qrModal.style.cssText = `
             position: fixed;
@@ -1529,7 +1525,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
                 
                 <div style="color: #ccc; font-size: 14px; margin: 15px 0;">
-                    Use your wallet app to scan the QR code
+                    Use your wallet app to scan the QR code and approve the connection
                 </div>
                 
                 <div style="margin-top: 20px;">
@@ -1542,25 +1538,100 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         document.body.appendChild(qrModal);
 
+        // Générer le QR code
+        generateRealQRCode(uri);
+
         // Fermer le modal
         document.getElementById('closeQR').addEventListener('click', () => {
             document.body.removeChild(qrModal);
-            reject(new Error("User cancelled connection"));
+            if (cb) cb();
         });
 
-        // Générer le vrai QR code
-        generateRealQRCode(wcUri);
+        // Stocker la callback pour la fermeture
+        window.walletConnectModal = { close: () => {
+            document.body.removeChild(qrModal);
+            if (cb) cb();
+        }};
+    }
+
+    /**
+     * Ferme le modal QR code
+     */
+    function closeQRCodeModal() {
+        if (window.walletConnectModal) {
+            window.walletConnectModal.close();
+            window.walletConnectModal = null;
+        }
+    }
+
+    /**
+     * Établit une vraie connexion WalletConnect
+     */
+    async function connectWithRealWalletConnect() {
+        try {
+            // Initialiser WalletConnect
+            const existingAccounts = await initializeRealWalletConnect();
+            if (existingAccounts) {
+                return existingAccounts;
+            }
+
+            console.log("Creating new WalletConnect session...");
+
+            // Créer une nouvelle session
+            return new Promise((resolve, reject) => {
+                if (!walletConnect) {
+                    reject(new Error("WalletConnect not initialized"));
+                    return;
+                }
+
+                // Créer la session
+                walletConnect.createSession()
+                    .then(() => {
+                        console.log("WalletConnect session created, waiting for approval...");
+                        
+                        // Écouter l'approbation de connexion
+                        walletConnect.on("connect", (error, payload) => {
+                            if (error) {
+                                reject(error);
+                                return;
+                            }
+
+                            // Connexion approuvée
+                            const { accounts } = payload.params[0];
+                            console.log("WalletConnect connected with accounts:", accounts);
+                            resolve(accounts);
+                        });
+
+                        // Écouter le rejet
+                        walletConnect.on("disconnect", (error) => {
+                            if (error) {
+                                reject(new Error("Connection rejected by user"));
+                            }
+                        });
+
+                        // Timeout après 2 minutes
+                        setTimeout(() => {
+                            reject(new Error("Connection timeout"));
+                        }, 120000);
+                    })
+                    .catch(reject);
+            });
+
+        } catch (error) {
+            console.error("Real WalletConnect connection failed:", error);
+            throw error;
+        }
     }
 
     /**
      * Génère un vrai QR code
      */
-    function generateRealQRCode(wcUri) {
+    function generateRealQRCode(uri) {
         setTimeout(() => {
             const qrDiv = document.getElementById('qrcode');
             if (window.QRCode) {
                 new window.QRCode(qrDiv, {
-                    text: wcUri,
+                    text: uri,
                     width: 200,
                     height: 200,
                     colorDark: "#000000",
@@ -1573,7 +1644,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 script.onload = () => {
                     if (window.QRCode) {
                         new window.QRCode(qrDiv, {
-                            text: wcUri,
+                            text: uri,
                             width: 200,
                             height: 200,
                             colorDark: "#000000",
@@ -1691,13 +1762,27 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     async function connectWithWalletConnect() {
         try {
-            const walletConnectProvider = await initializeWalletConnect();
-            const accounts = await walletConnectProvider.connect();
+            const accounts = await connectWithRealWalletConnect();
             
             console.log("WalletConnect connected with accounts:", accounts);
 
             if (accounts && accounts.length > 0) {
                 await updateButton(accounts);
+                
+                // Configurer les événements pour WalletConnect
+                if (walletConnect) {
+                    walletConnect.on("disconnect", (error) => {
+                        console.log("WalletConnect disconnected:", error);
+                        disconnectWallet();
+                    });
+                    
+                    walletConnect.on("session_update", (error, payload) => {
+                        if (error) return;
+                        const { accounts } = payload.params[0];
+                        console.log("Accounts updated:", accounts);
+                        updateButton(accounts);
+                    });
+                }
             } else {
                 throw new Error("No accounts received");
             }
@@ -1705,7 +1790,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) {
             console.error("WalletConnect connection error:", error);
             
-            if (error.message.includes("cancelled")) {
+            if (error.message.includes("cancelled") || error.message.includes("rejected")) {
                 throw new Error("Connection cancelled by user");
             }
             
@@ -1770,6 +1855,12 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     async function disconnectWallet() {
         try {
+            // Déconnecter WalletConnect si actif
+            if (walletConnect && walletConnect.connected) {
+                await walletConnect.killSession();
+                walletConnect = null;
+            }
+
             // Réinitialiser
             lastAccount = null;
             isDisconnected = true;
@@ -1791,11 +1882,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     function handleConnectionError(error) {
         let errorMessage = "Wallet connection failed";
 
-        if (error.message.includes("cancelled") || 
-            error.message.includes("rejected")) {
+        if (error.message.includes("cancelled") || error.message.includes("rejected")) {
             errorMessage = "Connection cancelled by user";
-        } else if (error.message.includes("not available")) {
-            errorMessage = "WalletConnect not available. Please try MetaMask or another wallet.";
+        } else if (error.message.includes("timeout")) {
+            errorMessage = "Connection timeout. Please try again.";
         } else {
             errorMessage = error.message;
         }
@@ -1898,6 +1988,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } catch (error) {
                     console.log("Injected wallet check failed:", error);
                 }
+            }
+
+            // Vérifier WalletConnect existant
+            try {
+                const existingAccounts = await initializeRealWalletConnect();
+                if (existingAccounts && existingAccounts.length > 0) {
+                    await updateButton(existingAccounts);
+                }
+            } catch (error) {
+                console.log("No existing WalletConnect session:", error);
             }
 
         } catch (error) {

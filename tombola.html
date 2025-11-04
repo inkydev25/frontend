@@ -1363,6 +1363,7 @@
     <!-- Main application script -->
 <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@coinbase/wallet-sdk@4.3.0/dist/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@coinbase/wallet-sdk@4.3.0/dist/index.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', async () => {
         // ===== CONSTANTS AND VARIABLES =====
@@ -1380,16 +1381,24 @@
                 return null;
             }
 
-            const coinbaseWallet = new CoinbaseWalletSDK({
-                appName: "INKY Tombola",
-                appLogoUrl: "https://yourdomain.com/inky-logo.png",
-                darkMode: false
-            });
+            try {
+                const coinbaseWallet = new CoinbaseWalletSDK({
+                    appName: "INKY Tombola",
+                    appLogoUrl: "https://yourdomain.com/inky-logo.png",
+                    darkMode: false
+                });
 
-            return coinbaseWallet.makeWeb3Provider({
-                chainId: 8453, // Base network
-                rpc: "https://mainnet.base.org"
-            });
+                // Créer le provider avec la bonne configuration
+                const provider = coinbaseWallet.makeWeb3Provider({
+                    chainId: 8453, // Base network
+                    rpc: "https://mainnet.base.org"
+                });
+
+                return provider;
+            } catch (error) {
+                console.error('Error initializing Coinbase Wallet:', error);
+                return null;
+            }
         }
 
         // ===== WALLET DETECTION FUNCTIONS =====
@@ -1424,8 +1433,8 @@
                 });
             }
             
-            // Wallet générique (fallback)
-            if (window.ethereum && wallets.length === 0) {
+            // Autres wallets injectés
+            if (window.ethereum && !window.ethereum.isMetaMask && !window.ethereum.isTrust) {
                 wallets.push({
                     id: 'generic',
                     name: 'Browser Wallet',
@@ -1455,67 +1464,94 @@
 
         async function connectCoinbaseWallet() {
             try {
+                console.log('Initializing Coinbase Wallet...');
+                
                 if (!coinbaseWalletProvider) {
                     coinbaseWalletProvider = initializeCoinbaseWallet();
                 }
 
                 if (!coinbaseWalletProvider) {
-                    throw new Error('Failed to initialize Coinbase Wallet');
+                    throw new Error('Failed to initialize Coinbase Wallet provider');
                 }
 
-                // Demander la connexion - cela redirigera vers la page d'approbation Coinbase
+                console.log('Requesting accounts from Coinbase Wallet...');
+                
+                // Demander la connexion
                 const accounts = await coinbaseWalletProvider.request({
                     method: 'eth_requestAccounts'
                 });
+
+                console.log('Coinbase Wallet accounts:', accounts);
 
                 if (accounts && accounts.length > 0) {
                     isDisconnected = false;
                     localStorage.setItem("walletDisconnected", "false");
                     await updateButton(accounts);
                     
-                    // Écouter les changements de compte
+                    // Écouter les changements
                     coinbaseWalletProvider.on('accountsChanged', (accounts) => {
+                        console.log('Coinbase accounts changed:', accounts);
                         updateButton(accounts);
                     });
                     
                     coinbaseWalletProvider.on('chainChanged', (chainId) => {
+                        console.log('Coinbase chain changed:', chainId);
                         window.location.reload();
                     });
                     
+                    console.log('Coinbase Wallet connected successfully');
                     return true;
+                } else {
+                    throw new Error('No accounts returned');
                 }
                 
-                return false;
             } catch (error) {
                 console.error('Coinbase Wallet connection error:', error);
                 
+                let errorMessage = "Coinbase Wallet connection failed";
+                
                 if (error.code === 4001) {
-                    showError("Connection rejected by user");
-                } else {
-                    showError("Coinbase Wallet connection failed");
+                    errorMessage = "Connection rejected by user";
+                } else if (error.message) {
+                    errorMessage = error.message;
                 }
+                
+                showError(errorMessage);
                 return false;
             }
         }
 
-        async function connectInjectedWallet(provider) {
+        async function connectInjectedWallet(provider, walletName) {
             try {
+                console.log(`Connecting to ${walletName}...`);
+                
                 const accounts = await provider.request({ 
                     method: 'eth_requestAccounts' 
                 });
                 
-                isDisconnected = false;
-                localStorage.setItem("walletDisconnected", "false");
-                await updateButton(accounts);
-                return true;
+                console.log(`${walletName} accounts:`, accounts);
+                
+                if (accounts && accounts.length > 0) {
+                    isDisconnected = false;
+                    localStorage.setItem("walletDisconnected", "false");
+                    await updateButton(accounts);
+                    return true;
+                } else {
+                    throw new Error('No accounts returned');
+                }
+                
             } catch (error) {
-                console.error('Injected wallet connection error:', error);
+                console.error(`${walletName} connection error:`, error);
+                
+                let errorMessage = `${walletName} connection failed`;
                 
                 if (error.code === 4001) {
-                    showError("Connection rejected by user");
-                } else {
-                    showError("Wallet connection failed");
+                    errorMessage = "Connection rejected by user";
+                } else if (error.message) {
+                    errorMessage = error.message;
                 }
+                
+                showError(errorMessage);
                 return false;
             }
         }
@@ -1542,7 +1578,7 @@
                     if (wallet.type === 'coinbase') {
                         await connectCoinbaseWallet();
                     } else if (wallet.provider) {
-                        await connectInjectedWallet(wallet.provider);
+                        await connectInjectedWallet(wallet.provider, wallet.name);
                     }
                 });
                 
@@ -1598,53 +1634,74 @@
 
         // ===== INITIALIZATION =====
         async function initializeExistingConnection() {
-            if (!isDisconnected) {
-                // Vérifier MetaMask/Injected first
-                if (window.ethereum) {
-                    try {
-                        const accounts = await window.ethereum.request({ 
-                            method: 'eth_accounts' 
-                        });
-                        if (accounts.length > 0) {
-                            await updateButton(accounts);
-                            return;
-                        }
-                    } catch (error) {
-                        console.error('Error checking injected connection:', error);
-                    }
-                }
-                
-                // Vérifier Coinbase Wallet
+            if (isDisconnected) {
+                return;
+            }
+
+            console.log('Checking existing connections...');
+            
+            // Vérifier d'abord les wallets injectés (MetaMask, etc.)
+            if (window.ethereum) {
                 try {
-                    coinbaseWalletProvider = initializeCoinbaseWallet();
-                    if (coinbaseWalletProvider) {
-                        const accounts = await coinbaseWalletProvider.request({
-                            method: 'eth_accounts'
-                        });
-                        if (accounts && accounts.length > 0) {
-                            await updateButton(accounts);
-                        }
+                    const accounts = await window.ethereum.request({ 
+                        method: 'eth_accounts' 
+                    });
+                    console.log('Injected wallet accounts:', accounts);
+                    
+                    if (accounts && accounts.length > 0) {
+                        await updateButton(accounts);
+                        return;
                     }
                 } catch (error) {
-                    console.error('Error checking Coinbase connection:', error);
+                    console.error('Error checking injected connection:', error);
                 }
+            }
+            
+            // Ensuite vérifier Coinbase Wallet
+            try {
+                coinbaseWalletProvider = initializeCoinbaseWallet();
+                if (coinbaseWalletProvider) {
+                    const accounts = await coinbaseWalletProvider.request({
+                        method: 'eth_accounts'
+                    });
+                    console.log('Coinbase Wallet existing accounts:', accounts);
+                    
+                    if (accounts && accounts.length > 0) {
+                        await updateButton(accounts);
+                        
+                        // Écouter les changements pour Coinbase
+                        coinbaseWalletProvider.on('accountsChanged', (accounts) => {
+                            updateButton(accounts);
+                        });
+                        
+                        coinbaseWalletProvider.on('chainChanged', (chainId) => {
+                            window.location.reload();
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking Coinbase connection:', error);
             }
         }
 
         function setupAccountListeners() {
-            // Listeners pour MetaMask/injected
+            // Listeners pour les wallets injectés
             if (window.ethereum) {
                 window.ethereum.on('accountsChanged', (accounts) => {
+                    console.log('Injected wallet accounts changed:', accounts);
                     updateButton(accounts);
                 });
                 
                 window.ethereum.on('chainChanged', (chainId) => {
+                    console.log('Injected wallet chain changed:', chainId);
                     window.location.reload();
                 });
             }
         }
 
         async function disconnectWallet() {
+            console.log('Disconnecting wallet...');
+            
             lastAccount = null;
             isDisconnected = true;
             localStorage.setItem("walletDisconnected", "true");
@@ -1654,6 +1711,7 @@
             if (coinbaseWalletProvider) {
                 try {
                     await coinbaseWalletProvider.disconnect();
+                    console.log('Coinbase Wallet disconnected');
                 } catch (error) {
                     console.log('Coinbase Wallet disconnection completed');
                 }
@@ -1675,6 +1733,13 @@
         // ===== START APPLICATION =====
         initializeExistingConnection();
         setupAccountListeners();
+
+        // Réessayer l'initialisation après un délai au cas où le SDK mettrait du temps à charger
+        setTimeout(() => {
+            if (!lastAccount && !isDisconnected) {
+                initializeExistingConnection();
+            }
+        }, 1000);
     });
 </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

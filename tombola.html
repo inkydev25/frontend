@@ -1365,6 +1365,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@coinbase/wallet-sdk@4.3.0/dist/index.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@metamask/sdk@0.2.1/dist/index.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@coinbase/wallet-sdk@4.3.0/dist/index.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', async () => {
         const button = document.getElementById('connectButton');
@@ -1372,35 +1373,44 @@
         const overlay = document.getElementById('popupOverlay');
         let lastAccount = null;
         let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
-        let walletConnectProvider = null;
+        let coinbaseProvider = null;
 
-        // ===== WALLET DETECTION =====
+        // ===== INITIALISATION COINBASE WALLET =====
+        function initializeCoinbaseWallet() {
+            try {
+                const coinbaseWallet = new CoinbaseWalletSDK({
+                    appName: "INKY Tombola",
+                    appLogoUrl: "https://yourdomain.com/inky-logo.png",
+                    darkMode: false
+                });
+
+                return coinbaseWallet.makeWeb3Provider({
+                    chainId: 8453, // Base
+                    rpc: "https://mainnet.base.org"
+                });
+            } catch (error) {
+                console.error('Coinbase SDK init error:', error);
+                return null;
+            }
+        }
+
+        // ===== DÉTECTION WALLETS =====
         function detectWallets() {
             const wallets = [];
             
-            // WalletConnect - option principale pour mobile
+            // Coinbase Wallet (comme nukl.ai)
             wallets.push({
-                id: 'walletconnect',
-                name: 'WalletConnect',
-                type: 'walletconnect'
+                id: 'coinbase',
+                name: 'Coinbase Wallet',
+                type: 'coinbase'
             });
             
             // MetaMask
-            if (window.ethereum && window.ethereum.isMetaMask) {
+            if (window.ethereum?.isMetaMask) {
                 wallets.push({
                     id: 'metamask',
-                    name: 'MetaMask',
+                    name: 'MetaMask', 
                     type: 'injected',
-                    provider: window.ethereum
-                });
-            }
-            
-            // Rabby Wallet
-            if (window.ethereum && window.ethereum.isRabby) {
-                wallets.push({
-                    id: 'rabby',
-                    name: 'Rabby Wallet',
-                    type: 'injected', 
                     provider: window.ethereum
                 });
             }
@@ -1408,112 +1418,58 @@
             return wallets;
         }
 
-        // ===== WALLETCONNECT POUR MOBILE =====
-        async function connectWalletConnect() {
+        // ===== CONNEXION COINBASE (comme nukl.ai) =====
+        async function connectCoinbaseWallet() {
             try {
-                // Configuration optimisée pour mobile
-                walletConnectProvider = new WalletConnectProvider.default({
-                    rpc: {
-                        8453: "https://mainnet.base.org" // Base network
-                    },
-                    chainId: 8453,
-                    bridge: "https://bridge.walletconnect.org",
-                    qrcodeModal: false, // IMPORTANT: Pas de QR code sur mobile
-                    qrcode: false
+                if (!coinbaseProvider) {
+                    coinbaseProvider = initializeCoinbaseWallet();
+                }
+
+                if (!coinbaseProvider) {
+                    throw new Error('Coinbase Wallet SDK failed to initialize');
+                }
+
+                console.log('Connecting to Coinbase Wallet...');
+                
+                // Cette ligne va rediriger vers https://keys.coinbase.com/connect
+                const accounts = await coinbaseProvider.request({
+                    method: 'eth_requestAccounts'
                 });
 
-                // Sur mobile, WalletConnect va automatiquement :
-                // 1. Détecter les apps wallet installées
-                // 2. Proposer de les ouvrir
-                // 3. Rediriger vers l'app pour approbation
-                // 4. Revenir automatiquement sur votre page après approbation
-                
-                console.log('Enabling WalletConnect...');
-                await walletConnectProvider.enable();
-
-                const accounts = walletConnectProvider.accounts;
-                console.log('WalletConnect accounts:', accounts);
+                console.log('Coinbase connection result:', accounts);
                 
                 if (accounts && accounts.length > 0) {
                     isDisconnected = false;
                     localStorage.setItem("walletDisconnected", "false");
                     await updateButton(accounts);
-                    showSuccess("Wallet connected successfully!");
+                    showSuccess("Connected to Coinbase Wallet!");
                     
                     // Écouter les événements
-                    walletConnectProvider.on("accountsChanged", (accounts) => {
+                    coinbaseProvider.on('accountsChanged', (accounts) => {
                         updateButton(accounts);
                     });
                     
-                    walletConnectProvider.on("chainChanged", (chainId) => {
-                        window.location.reload();
-                    });
-                    
-                    walletConnectProvider.on("disconnect", () => {
-                        lastAccount = null;
-                        updateButton([]);
-                    });
-                    
                     return true;
                 }
                 
                 return false;
                 
             } catch (error) {
-                console.error('WalletConnect error:', error);
+                console.error('Coinbase connection error:', error);
                 
-                if (error.message?.includes('User closed modal')) {
-                    showError("Connection cancelled");
-                } else if (error.message?.includes('Session rejected')) {
+                if (error.code === 4001) {
                     showError("Connection rejected");
-                } else if (error.message?.includes('No matching key')) {
-                    // Essayer avec une autre configuration
-                    return await connectWalletConnectFallback();
                 } else {
-                    showError("Connection failed. Please try another wallet.");
+                    showError("Coinbase Wallet connection failed");
                 }
                 return false;
             }
         }
 
-        // ===== FALLBACK POUR WALLETCONNECT =====
-        async function connectWalletConnectFallback() {
+        // ===== CONNEXION META MASK =====
+        async function connectMetaMask() {
             try {
-                // Configuration alternative
-                walletConnectProvider = new WalletConnectProvider.default({
-                    rpc: {
-                        1: "https://cloudflare-eth.com",
-                        8453: "https://mainnet.base.org"
-                    },
-                    chainId: 8453,
-                    bridge: "https://bridge.walletconnect.org",
-                    qrcodeModal: true // Activer le modal si nécessaire
-                });
-
-                await walletConnectProvider.enable();
-                
-                const accounts = walletConnectProvider.accounts;
-                if (accounts && accounts.length > 0) {
-                    isDisconnected = false;
-                    localStorage.setItem("walletDisconnected", "false");
-                    await updateButton(accounts);
-                    showSuccess("Connected!");
-                    return true;
-                }
-                
-                return false;
-                
-            } catch (error) {
-                console.error('WalletConnect fallback error:', error);
-                showError("Please install a wallet app like MetaMask or Rabby");
-                return false;
-            }
-        }
-
-        // ===== CONNEXION INJECTED (Desktop) =====
-        async function connectInjectedWallet(provider, walletName) {
-            try {
-                const accounts = await provider.request({
+                const accounts = await window.ethereum.request({
                     method: 'eth_requestAccounts'
                 });
 
@@ -1521,24 +1477,19 @@
                     isDisconnected = false;
                     localStorage.setItem("walletDisconnected", "false");
                     await updateButton(accounts);
-                    showSuccess(`Connected to ${walletName}!`);
+                    showSuccess("Connected to MetaMask!");
                     return true;
                 }
                 return false;
                 
             } catch (error) {
-                console.error(`${walletName} connection error:`, error);
-                
-                if (error.code === 4001) {
-                    showError("Connection rejected by user");
-                } else {
-                    showError(`${walletName} connection failed`);
-                }
+                console.error('MetaMask error:', error);
+                showError("MetaMask connection failed");
                 return false;
             }
         }
 
-        // ===== UTILITY FUNCTIONS =====
+        // ===== FONCTIONS UTILITAIRES =====
         async function updateButton(accounts) {
             if (isDisconnected) accounts = [];
             const account = accounts.length > 0 ? accounts[0] : null;
@@ -1570,16 +1521,15 @@
                     color: var(--text-color-light);
                     font-weight: bold;
                     cursor: pointer;
-                    transition: transform 0.2s;
                 `;
                 
                 btn.onclick = async () => {
                     hideWalletPopup();
                     
-                    if (wallet.type === 'walletconnect') {
-                        await connectWalletConnect();
-                    } else if (wallet.type === 'injected') {
-                        await connectInjectedWallet(wallet.provider, wallet.name);
+                    if (wallet.id === 'coinbase') {
+                        await connectCoinbaseWallet();
+                    } else if (wallet.id === 'metamask') {
+                        await connectMetaMask();
                     }
                 };
                 
@@ -1596,47 +1546,19 @@
         }
 
         function showError(message) {
-            alert(`Error: ${message}`);
+            alert(message);
         }
 
         function showSuccess(message) {
-            alert(`Success: ${message}`);
+            alert(message);
         }
 
-        // ===== INITIALIZATION =====
-        async function initialize() {
-            if (!isDisconnected && window.ethereum) {
-                try {
-                    const accounts = await window.ethereum.request({ 
-                        method: 'eth_accounts' 
-                    });
-                    if (accounts.length > 0) {
-                        await updateButton(accounts);
-                    }
-                } catch (error) {
-                    console.error('Error checking existing connection:', error);
-                }
-            }
-
-            if (window.ethereum) {
-                window.ethereum.on('accountsChanged', (accounts) => {
-                    updateButton(accounts);
-                });
-            }
-        }
-
-        // ===== EVENT LISTENERS =====
+        // ===== ÉVÉNEMENTS =====
         button.addEventListener('click', () => {
             if (lastAccount) {
                 lastAccount = null;
                 isDisconnected = true;
                 localStorage.setItem("walletDisconnected", "true");
-                
-                if (walletConnectProvider) {
-                    walletConnectProvider.disconnect();
-                    walletConnectProvider = null;
-                }
-                
                 updateButton([]);
             } else {
                 showWalletPopup();
@@ -1645,8 +1567,8 @@
 
         overlay.addEventListener('click', hideWalletPopup);
 
-        // Démarrer
-        initialize();
+        // DÉMARRER
+        initializeCoinbaseWallet(); // Pré-initialiser
     });
 </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

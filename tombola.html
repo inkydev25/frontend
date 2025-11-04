@@ -1432,20 +1432,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ===== WALLET CONNECTION FUNCTIONS =====
 
     /**
-     * Charge la bibliothèque WalletConnect
+     * Charge WalletConnect Web3Provider
      */
-    function loadWalletConnect() {
+    async function loadWalletConnect() {
         return new Promise((resolve, reject) => {
-            if (window.WalletConnect) {
-                resolve(window.WalletConnect);
+            if (window.WalletConnectProvider) {
+                resolve(window.WalletConnectProvider);
                 return;
             }
 
             const script = document.createElement('script');
-            script.src = 'https://unpkg.com/@walletconnect/client@1.8.0/dist/umd/index.min.js';
+            script.src = 'https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js';
             script.onload = () => {
-                if (window.WalletConnect) {
-                    resolve(window.WalletConnect);
+                if (window.WalletConnectProvider) {
+                    resolve(window.WalletConnectProvider);
                 } else {
                     reject(new Error('WalletConnect not loaded'));
                 }
@@ -1456,22 +1456,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Initialise WalletConnect pour mobile avec vraie session
+     * Initialise WalletConnect avec vraie session
      */
     async function initializeWalletConnect() {
         try {
-            console.log("Initializing real WalletConnect for mobile...");
+            console.log("Initializing real WalletConnect...");
             
-            await loadWalletConnect();
+            const WalletConnectProvider = await loadWalletConnect();
             
-            // Créer une nouvelle session WalletConnect
-            walletConnect = new window.WalletConnect.default({
-                bridge: "https://bridge.walletconnect.org",
-                clientMeta: {
-                    description: "INKY Tombola DApp",
-                    url: "https://inkydev25.github.io",
-                    icons: ["https://inkydev25.github.io/frontend/inky-logo.png"],
-                    name: "INKY Tombola"
+            // Créer le provider WalletConnect
+            walletConnect = new WalletConnectProvider.default({
+                infuraId: "b6bf7e2c5b5a4f5a8b5a5a5a5a5a5a5a", // Infura ID gratuit pour test
+                chainId: 84532, // Base Sepolia
+                qrcode: false, // Pas de QR code modal automatique
+                rpc: {
+                    84532: "https://sepolia.base.org"
                 }
             });
 
@@ -1490,87 +1489,52 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             showLoading("Creating connection...");
             
-            const connector = await initializeWalletConnect();
+            const provider = await initializeWalletConnect();
             
             // Vérifier si déjà connecté
-            if (connector.connected) {
-                console.log("Already connected:", connector.accounts);
-                return connector.accounts;
+            if (provider.wc.connected) {
+                console.log("Already connected:", provider.accounts);
+                return provider.accounts;
             }
 
-            console.log("Creating new WalletConnect session...");
+            console.log("Enabling WalletConnect...");
 
-            // Créer une nouvelle session
-            await connector.createSession();
+            // Activer la connexion - cela va créer une session
+            await provider.enable();
             
-            hideLoading();
-            showLoading("Waiting for approval...");
-
-            console.log("Session created, URI:", connector.uri);
+            console.log("WalletConnect enabled, waiting for approval...");
             
-            // Sur mobile, ouvrir le deep link WalletConnect
-            if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                openWalletConnectMobile(connector.uri);
+            // Les comptes sont maintenant disponibles
+            const accounts = provider.accounts;
+            
+            if (accounts && accounts.length > 0) {
+                console.log("WalletConnect connected with accounts:", accounts);
+                return accounts;
+            } else {
+                throw new Error("No accounts received");
             }
-
-            // Attendre l'approbation
-            return new Promise((resolve, reject) => {
-                // Écouter l'événement de connexion
-                connector.on("connect", (error, payload) => {
-                    if (error) {
-                        reject(error);
-                        return;
-                    }
-
-                    console.log("WalletConnect connected!", payload);
-                    const { accounts } = payload.params[0];
-                    hideLoading();
-                    resolve(accounts);
-                });
-
-                // Écouter le rejet
-                connector.on("disconnect", (error) => {
-                    if (error) {
-                        hideLoading();
-                        reject(new Error("Connection rejected"));
-                    }
-                });
-
-                // Timeout après 2 minutes
-                setTimeout(() => {
-                    hideLoading();
-                    reject(new Error("Connection timeout"));
-                }, 120000);
-            });
 
         } catch (error) {
-            hideLoading();
+            console.error("WalletConnect connection error:", error);
             throw error;
         }
     }
 
     /**
-     * Ouvre WalletConnect sur mobile avec le vrai URI
+     * Ouvre le wallet mobile avec deep link
      */
-    function openWalletConnectMobile(uri) {
-        console.log("Opening WalletConnect on mobile with URI:", uri);
+    function openMobileWallet(connector) {
+        if (!connector.uri) return;
         
-        // Encoder l'URI pour le deep link
-        const encodedUri = encodeURIComponent(uri);
-        const deepLink = `wc:${uri.split('wc:')[1]}`;
-        const universalLink = `https://walletconnect.com/wc?uri=${encodedUri}`;
+        console.log("Opening mobile wallet with URI:", connector.uri);
         
-        console.log("Deep link:", deepLink);
-        console.log("Universal link:", universalLink);
+        // Créer le deep link WalletConnect
+        const deepLink = connector.uri;
         
-        // Essayer d'abord le deep link direct
-        window.location.href = deepLink;
+        // Sur mobile, ouvrir dans un nouvel onglet
+        window.open(deepLink, '_blank');
         
-        // Fallback après un court délai
-        setTimeout(() => {
-            // Si on est toujours sur la page, utiliser le lien universel
-            window.location.href = universalLink;
-        }, 500);
+        console.log("Wallet opened, waiting for approval...");
     }
 
     /**
@@ -1655,13 +1619,18 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     async function connectWallet(wallet) {
         try {
+            showLoading("Connecting wallet...");
+
             if (wallet.isWalletConnect) {
                 await connectWithWalletConnect();
             } else if (wallet.isInjected) {
                 await connectWithInjected(wallet.provider);
             }
+
+            hideLoading();
             
         } catch (error) {
+            hideLoading();
             console.error("Wallet connection failed:", error);
             handleConnectionError(error);
         }
@@ -1679,9 +1648,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (accounts && accounts.length > 0) {
                 await updateButton(accounts);
                 
-                // Configurer les événements pour les déconnexions futures
-                if (walletConnect) {
-                    walletConnect.on("disconnect", (error) => {
+                // Configurer les événements pour les déconnexions
+                if (walletConnect && walletConnect.wc) {
+                    walletConnect.wc.on("disconnect", (error) => {
                         console.log("WalletConnect disconnected:", error);
                         disconnectWallet();
                     });
@@ -1706,11 +1675,9 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     async function connectWithInjected(provider) {
         try {
-            showLoading("Connecting...");
             const accounts = await provider.request({ 
                 method: 'eth_requestAccounts' 
             });
-            hideLoading();
             
             if (!accounts || accounts.length === 0) {
                 throw new Error("No accounts received");
@@ -1720,7 +1687,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             setupProviderEvents(provider);
             
         } catch (error) {
-            hideLoading();
             console.error("Injected wallet connection error:", error);
             
             if (error.code === 4001) {
@@ -1762,8 +1728,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function disconnectWallet() {
         try {
             // Déconnecter WalletConnect si actif
-            if (walletConnect && walletConnect.connected) {
-                await walletConnect.killSession();
+            if (walletConnect && walletConnect.wc && walletConnect.wc.connected) {
+                await walletConnect.wc.killSession();
                 walletConnect = null;
             }
 
@@ -1790,8 +1756,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (error.message.includes("cancelled") || error.message.includes("rejected")) {
             errorMessage = "Connection cancelled by user";
-        } else if (error.message.includes("timeout")) {
-            errorMessage = "Connection timeout. Please try again.";
+        } else if (error.message.includes("not available")) {
+            errorMessage = "WalletConnect not available. Please try MetaMask or another wallet.";
         } else {
             errorMessage = error.message;
         }

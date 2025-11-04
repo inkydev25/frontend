@@ -1422,7 +1422,7 @@
         async function connectCoinbaseWallet() {
             try {
                 // Créer l'URL de redirection comme sur nukl.ai
-                const redirectUrl = `https://keys.coinbase.com/connect?sdkName=web3&sdkVersion=1.0&origin=${encodeURIComponent(window.location.origin)}&coop=null`;
+                const redirectUrl = `https://keys.coinbase.com/connect?sdkName=%40coinbase%2Fwallet-sdk&sdkVersion=4.3.0&origin=${encodeURIComponent(window.location.origin)}&coop=null`;
                 
                 // Stocker l'état avant la redirection
                 localStorage.setItem('pendingWalletConnection', 'coinbase');

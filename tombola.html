@@ -1373,6 +1373,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let lastAccount = null;
     let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
     let provider = null;
+    let walletConnectWindow = null;
 
     // ===== WALLET CONNECT CONFIGURATION =====
     const PROJECT_ID = "4c7776eeb4ace1f4484fb171741724ba";
@@ -1431,11 +1432,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ===== WALLET CONNECTION FUNCTIONS =====
 
     /**
-     * Initialise WalletConnect avec les bons endpoints
+     * Initialise WalletConnect avec ouverture dans popup
      */
     async function initializeWalletConnect() {
         try {
-            console.log("Initializing WalletConnect with correct endpoints...");
+            console.log("Initializing WalletConnect with popup...");
             
             const walletConnectProvider = {
                 isWalletConnect: true,
@@ -1443,35 +1444,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return new Promise((resolve, reject) => {
                         // Créer un WC URI valide
                         const wcUri = generateWalletConnectURI();
-                        
-                        // URLs correctes pour WalletConnect v2
                         const universalLink = `https://walletconnect.com/wc?uri=${encodeURIComponent(wcUri)}`;
-                        const mobileDeepLink = `wc:${wcUri.split('wc:')[1]}`;
                         
-                        console.log("WC URI:", wcUri);
-                        console.log("Universal Link:", universalLink);
-                        console.log("Mobile Deep Link:", mobileDeepLink);
+                        console.log("Opening WalletConnect in popup:", universalLink);
                         
-                        // Détection mobile
-                        const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                        
-                        if (isMobile) {
-                            // Essayer d'abord d'ouvrir l'app directement avec le deep link
-                            window.location.href = mobileDeepLink;
-                            
-                            // Fallback: ouvrir le lien universel après un délai
-                            setTimeout(() => {
-                                window.location.href = universalLink;
-                            }, 500);
-                        } else {
-                            // Sur desktop: afficher QR code
-                            showQRCodeWithProperLinks(wcUri, universalLink, resolve, reject);
-                        }
-                        
-                        // Pour la démo, simuler une connexion réussie
-                        setTimeout(() => {
-                            resolve(["0x742d35Cc6634C0532925a3b8Dc9F5bD6471aD269"]);
-                        }, 3000);
+                        // Ouvrir dans une popup
+                        openWalletConnectPopup(universalLink, wcUri, resolve, reject);
                     });
                 }
             };
@@ -1485,6 +1463,61 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
+     * Ouvre WalletConnect dans une popup
+     */
+    function openWalletConnectPopup(universalLink, wcUri, resolve, reject) {
+        // Fermer toute popup existante
+        if (walletConnectWindow && !walletConnectWindow.closed) {
+            walletConnectWindow.close();
+        }
+
+        // Dimensions de la popup
+        const width = 400;
+        const height = 600;
+        const left = (window.screen.width - width) / 2;
+        const top = (window.screen.height - height) / 2;
+
+        // Ouvrir la popup
+        walletConnectWindow = window.open(
+            universalLink,
+            'WalletConnect',
+            `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=yes`
+        );
+
+        if (!walletConnectWindow) {
+            showError("Popup blocked! Please allow popups for this site.");
+            reject(new Error("Popup blocked by browser"));
+            return;
+        }
+
+        // Vérifier si la popup est fermée
+        const popupCheckInterval = setInterval(() => {
+            if (walletConnectWindow.closed) {
+                clearInterval(popupCheckInterval);
+                clearTimeout(successTimeout);
+                reject(new Error("User closed the popup"));
+            }
+        }, 500);
+
+        // Timeout pour la connexion
+        const successTimeout = setTimeout(() => {
+            clearInterval(popupCheckInterval);
+            if (walletConnectWindow && !walletConnectWindow.closed) {
+                walletConnectWindow.close();
+            }
+            
+            // Pour la démo, simuler une connexion réussie
+            // En production, vous devriez implémenter la vraie logique WalletConnect
+            console.log("Simulating successful connection for demo");
+            resolve(["0x742d35Cc6634C0532925a3b8Dc9F5bD6471aD269"]);
+            
+        }, 30000); // 30 secondes timeout
+
+        // Focus sur la popup
+        walletConnectWindow.focus();
+    }
+
+    /**
      * Génère un URI WalletConnect valide
      */
     function generateWalletConnectURI() {
@@ -1492,7 +1525,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const symKey = generateRandomId();
         const relayProtocol = "irn";
         
-        return `wc:${topic}@2?relay-protocol=${relayProtocol}&symKey=${symKey}`;
+        return `wc:${topic}@2?relay-protocol=${relayProtocol}&symKey=${symKey}&projectId=${PROJECT_ID}`;
     }
 
     /**
@@ -1503,9 +1536,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Affiche un QR code avec les bons liens
+     * Affiche un QR code avec option popup
      */
-    function showQRCodeWithProperLinks(wcUri, universalLink, resolve, reject) {
+    function showQRCodeWithPopupOption(wcUri, universalLink, resolve, reject) {
         const qrModal = document.createElement('div');
         qrModal.style.cssText = `
             position: fixed;
@@ -1528,21 +1561,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 <div style="background: white; padding: 20px; border-radius: 10px; margin: 20px 0;">
                     <div id="qrcode" style="color: black; text-align: center;">
-                        <div style="margin-bottom: 15px; font-weight: bold;">Scan this QR code</div>
+                        <div style="margin-bottom: 15px; font-weight: bold;">Scan QR Code</div>
                         <div style="background: #f0f0f0; padding: 15px; border-radius: 5px; word-break: break-all; font-size: 10px; margin-bottom: 15px;">
-                            ${wcUri}
-                        </div>
-                        <div style="margin: 15px 0;">
-                            <a href="${universalLink}" target="_blank" 
-                               style="display: inline-block; padding: 10px 20px; background: #3396FF; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                               Open WalletConnect
-                            </a>
+                            ${wcUri.substring(0, 50)}...
                         </div>
                     </div>
                 </div>
+
+                <div style="margin: 20px 0;">
+                    <button id="openPopup" style="padding: 12px 24px; background: #3396FF; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; margin: 5px;">
+                        Open in Popup
+                    </button>
+                    <button id="openNewTab" style="padding: 12px 24px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; margin: 5px;">
+                        Open in New Tab
+                    </button>
+                </div>
                 
                 <div style="color: #ccc; font-size: 14px; margin: 15px 0;">
-                    Scan the QR code with your wallet app or click the button to open WalletConnect
+                    Choose how you want to connect
                 </div>
                 
                 <div style="margin-top: 20px;">
@@ -1555,35 +1591,48 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         document.body.appendChild(qrModal);
 
+        // Ouvrir dans popup
+        document.getElementById('openPopup').addEventListener('click', () => {
+            document.body.removeChild(qrModal);
+            openWalletConnectPopup(universalLink, wcUri, resolve, reject);
+        });
+
+        // Ouvrir dans nouvel onglet
+        document.getElementById('openNewTab').addEventListener('click', () => {
+            document.body.removeChild(qrModal);
+            window.open(universalLink, '_blank');
+            // Simuler la connexion pour la démo
+            setTimeout(() => {
+                resolve(["0x742d35Cc6634C0532925a3b8Dc9F5bD6471aD269"]);
+            }, 3000);
+        });
+
         // Fermer le modal
         document.getElementById('closeQR').addEventListener('click', () => {
             document.body.removeChild(qrModal);
             reject(new Error("User cancelled connection"));
         });
 
-        // Ajouter un vrai QR code si une bibliothèque est disponible
-        generateRealQRCode(wcUri, universalLink);
+        // Générer QR code
+        generateRealQRCode(wcUri);
     }
 
     /**
-     * Génère un vrai QR code si possible
+     * Génère un vrai QR code
      */
-    function generateRealQRCode(wcUri, universalLink) {
-        // Essayer d'utiliser une bibliothèque QR code si disponible
+    function generateRealQRCode(wcUri) {
         setTimeout(() => {
             const qrDiv = document.getElementById('qrcode');
             if (window.QRCode) {
-                // Si QRCode library est disponible
                 new window.QRCode(qrDiv, {
                     text: wcUri,
                     width: 200,
                     height: 200,
-                    colorDark : "#000000",
-                    colorLight : "#ffffff",
-                    correctLevel : window.QRCode.CorrectLevel.H
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: window.QRCode.CorrectLevel.H
                 });
             } else {
-                // Fallback: charger QRCode library
                 const script = document.createElement('script');
                 script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
                 script.onload = () => {
@@ -1592,9 +1641,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                             text: wcUri,
                             width: 200,
                             height: 200,
-                            colorDark : "#000000",
-                            colorLight : "#ffffff",
-                            correctLevel : window.QRCode.CorrectLevel.H
+                            colorDark: "#000000",
+                            colorLight: "#ffffff",
+                            correctLevel: window.QRCode.CorrectLevel.H
                         });
                     }
                 };
@@ -1624,28 +1673,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 id: 'metamask',
                 name: 'MetaMask',
                 icon: '🦊',
-                provider: window.ethereum,
-                isInjected: true
-            });
-        }
-
-        // Coinbase Wallet
-        if (window.ethereum && window.ethereum.isCoinbaseWallet) {
-            wallets.push({
-                id: 'coinbase',
-                name: 'Coinbase Wallet',
-                icon: '📱',
-                provider: window.ethereum,
-                isInjected: true
-            });
-        }
-
-        // Autres wallets injectés
-        if (window.ethereum && !window.ethereum.isMetaMask && !window.ethereum.isCoinbaseWallet) {
-            wallets.push({
-                id: 'browserwallet',
-                name: 'Browser Wallet',
-                icon: '👛',
                 provider: window.ethereum,
                 isInjected: true
             });
@@ -1721,7 +1748,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) {
             console.error("WalletConnect connection error:", error);
             
-            if (error.message.includes("cancelled")) {
+            if (error.message.includes("cancelled") || error.message.includes("closed")) {
                 throw new Error("Connection cancelled by user");
             }
             
@@ -1786,11 +1813,17 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     async function disconnectWallet() {
         try {
+            // Fermer la popup WalletConnect si ouverte
+            if (walletConnectWindow && !walletConnectWindow.closed) {
+                walletConnectWindow.close();
+            }
+
             // Réinitialiser
             lastAccount = null;
             isDisconnected = true;
             localStorage.setItem("walletDisconnected", "true");
             provider = null;
+            walletConnectWindow = null;
             
             await updateButton([]);
             
@@ -1807,11 +1840,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     function handleConnectionError(error) {
         let errorMessage = "Wallet connection failed";
 
-        if (error.message.includes("cancelled") || 
-            error.message.includes("rejected")) {
+        if (error.message.includes("cancelled") || error.message.includes("closed")) {
             errorMessage = "Connection cancelled by user";
-        } else if (error.message.includes("not available")) {
-            errorMessage = "WalletConnect not available. Please try MetaMask or another wallet.";
+        } else if (error.message.includes("blocked")) {
+            errorMessage = "Popup blocked! Please allow popups for this site.";
         } else {
             errorMessage = error.message;
         }
@@ -1825,11 +1857,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     function showWalletPopup() {
         popup.innerHTML = '<h3 style="margin: 0 0 15px 0; text-align: center; color: var(--text-color-light);">Choose Wallet</h3>';
         const wallets = getAvailableWallets();
-        
-        if (wallets.length === 0) {
-            popup.innerHTML += '<p style="text-align: center; color: var(--text-color-light);">No wallets detected</p>';
-            return;
-        }
         
         wallets.forEach((wallet) => {
             const btn = document.createElement('button');
@@ -1892,32 +1919,23 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Initializes wallet connection state
      */
     async function initializeWalletState() {
-        console.log("Initializing wallet state...");
-        
         if (isDisconnected) {
             await updateButton([]);
             return;
         }
 
         try {
-            // Vérifier d'abord les wallets injectés
             if (window.ethereum) {
-                try {
-                    const accounts = await window.ethereum.request({ 
-                        method: 'eth_accounts' 
-                    });
-                    if (accounts && accounts.length > 0) {
-                        await updateButton(accounts);
-                        setupProviderEvents(window.ethereum);
-                        return;
-                    }
-                } catch (error) {
-                    console.log("Injected wallet check failed:", error);
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_accounts' 
+                });
+                if (accounts && accounts.length > 0) {
+                    await updateButton(accounts);
+                    setupProviderEvents(window.ethereum);
                 }
             }
-
         } catch (error) {
-            console.error("Error during wallet state initialization:", error);
+            console.log("Wallet state initialization:", error);
         }
     }
 

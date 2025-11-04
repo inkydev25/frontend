@@ -1431,17 +1431,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function initializeWalletConnect() {
         try {
             console.log("Initializing WalletConnect v2 client...");
-            const { SignClient } = window.WalletConnect;
-            wcClient = await SignClient.init({
-                projectId: PROJECT_ID,
-                relayUrl: "wss://relay.walletconnect.com",
-                metadata: {
-                    name: "My Web3 App",
-                    description: "My DApp using WalletConnect",
-                    url: window.location.origin,
-                    icons: ["https://walletconnect.com/walletconnect-logo.png"]
-                }
-            });
+const SignClient = window.WalletConnectSignClient.default;
+wcClient = await SignClient.init({
+    projectId: PROJECT_ID,
+    relayUrl: "wss://relay.walletconnect.com",
+    metadata: {
+        name: "My Web3 App",
+        description: "My DApp using WalletConnect",
+        url: window.location.origin,
+        icons: ["https://walletconnect.com/walletconnect-logo.png"]
+    }
+});
+
             return wcClient;
         } catch (err) {
             console.error("WalletConnect init failed:", err);

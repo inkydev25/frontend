@@ -1435,7 +1435,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             console.log("🔄 Initializing WalletConnect...");
             
-            const SignClient = window.WalletConnectSignClient?.default;
+            const SignClient = window.WalletConnect?.SignClient;
+
             if (!SignClient) throw new Error("WalletConnect SDK not found");
 
             const client = await SignClient.init({

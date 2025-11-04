@@ -1373,9 +1373,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     let lastAccount = null;
     let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
     let walletConnectProvider = null;
+    let isWalletConnectLoaded = false;
 
     // ===== WALLET CONNECT CONFIGURATION =====
-    const PROJECT_ID = "4c7776eeb4ace1f4484fb171741724ba"; // Votre Project ID
+    const PROJECT_ID = "4c7776eeb4ace1f4484fb171741724ba";
 
     // ===== UTILITY FUNCTIONS =====
     
@@ -1431,54 +1432,86 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ===== WALLET CONNECTION FUNCTIONS =====
 
     /**
-     * Charge WalletConnect dynamiquement
+     * Charge WalletConnect avec plusieurs CDN de fallback
      */
-    function loadWalletConnectLibrary() {
+    async function loadWalletConnectLibrary() {
+        if (isWalletConnectLoaded) {
+            return window.EthereumProvider;
+        }
+
+        const cdns = [
+            'https://unpkg.com/@walletconnect/ethereum-provider@2.10.1/dist/umd/index.min.js',
+            'https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.10.1/dist/umd/index.min.js',
+            'https://esm.sh/@walletconnect/ethereum-provider@2.10.1'
+        ];
+
+        for (const cdn of cdns) {
+            try {
+                console.log(`Trying to load WalletConnect from: ${cdn}`);
+                await loadScript(cdn);
+                
+                if (window.EthereumProvider) {
+                    console.log("WalletConnect loaded successfully from:", cdn);
+                    isWalletConnectLoaded = true;
+                    return window.EthereumProvider;
+                }
+            } catch (error) {
+                console.warn(`Failed to load from ${cdn}:`, error);
+                continue;
+            }
+        }
+
+        throw new Error('All CDN attempts failed');
+    }
+
+    /**
+     * Charge un script dynamiquement
+     */
+    function loadScript(src) {
         return new Promise((resolve, reject) => {
-            if (window.EthereumProvider) {
-                resolve(window.EthereumProvider);
+            // Vérifier si déjà chargé
+            if (document.querySelector(`script[src="${src}"]`)) {
+                resolve();
                 return;
             }
 
             const script = document.createElement('script');
-            script.src = 'https://unpkg.com/@walletconnect/ethereum-provider@2.10.1/dist/umd/index.min.js';
+            script.src = src;
             script.onload = () => {
-                if (window.EthereumProvider) {
-                    resolve(window.EthereumProvider);
-                } else {
-                    reject(new Error('WalletConnect library loaded but EthereumProvider not found'));
-                }
+                // Donner un peu de temps pour l'initialisation
+                setTimeout(resolve, 100);
             };
-            script.onerror = () => reject(new Error('Failed to load WalletConnect script'));
+            script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
             document.head.appendChild(script);
         });
     }
 
     /**
-     * Initializes WalletConnect v2
+     * Initializes WalletConnect
      */
     async function initializeWalletConnect() {
         try {
-            console.log("Initializing WalletConnect with project ID:", PROJECT_ID);
+            console.log("Initializing WalletConnect...");
             
             // Charger la bibliothèque
             const EthereumProvider = await loadWalletConnectLibrary();
             
+            if (!EthereumProvider) {
+                throw new Error('EthereumProvider not available after loading');
+            }
+
             // Initialiser le provider
             walletConnectProvider = await EthereumProvider.init({
                 projectId: PROJECT_ID,
-                chains: [84532], // Base Sepolia
+                chains: [84532],
                 showQrModal: true,
                 qrModalOptions: {
-                    themeMode: 'dark',
-                    themeVariables: {
-                        '--wcm-z-index': '10000'
-                    }
+                    themeMode: 'dark'
                 },
                 metadata: {
                     name: "INKY Tombola",
                     description: "INKY Tombola DApp",
-                    url: "https://inkydev25.github.io",
+                    url: window.location.origin,
                     icons: ["https://inkydev25.github.io/frontend/inky-logo.png"]
                 }
             });
@@ -1507,18 +1540,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         } catch (error) {
             console.error("WalletConnect initialization failed:", error);
-            
-            // Message d'erreur plus détaillé
-            let errorMessage = "WalletConnect initialization failed: ";
-            if (error.message.includes("projectId")) {
-                errorMessage += "Invalid Project ID or domain not whitelisted.";
-            } else if (error.message.includes("Failed to load")) {
-                errorMessage += "Failed to load WalletConnect library.";
-            } else {
-                errorMessage += error.message;
-            }
-            
-            throw new Error(errorMessage);
+            throw new Error("WalletConnect library failed to load. Please check your internet connection.");
         }
     }
 
@@ -1730,14 +1752,28 @@ document.addEventListener('DOMContentLoaded', async () => {
             error.message.includes("rejected") || 
             error.message.includes("User rejected")) {
             errorMessage = "Connection cancelled by user";
-        } else if (error.message.includes("Invalid Project ID") || 
-                   error.message.includes("domain not whitelisted")) {
-            errorMessage = "WalletConnect configuration error. Please check your Project ID and domain whitelisting.";
+        } else if (error.message.includes("failed to load")) {
+            errorMessage = "WalletConnect not available. Please check your internet connection and try again.";
         } else {
             errorMessage = error.message;
         }
 
         showError(errorMessage);
+    }
+
+    /**
+     * Preload WalletConnect library in background
+     */
+    function preloadWalletConnect() {
+        // Précharger WalletConnect en arrière-plan
+        setTimeout(async () => {
+            try {
+                await loadWalletConnectLibrary();
+                console.log("WalletConnect preloaded successfully");
+            } catch (error) {
+                console.log("WalletConnect preload failed (normal if user doesn't use it):", error);
+            }
+        }, 1000);
     }
 
     /**
@@ -1835,21 +1871,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }
 
-            // Ensuite vérifier WalletConnect
-            try {
-                await initializeWalletConnect();
-                if (walletConnectProvider && walletConnectProvider.connected) {
-                    const accounts = await walletConnectProvider.request({
-                        method: 'eth_accounts'
-                    });
-                    if (accounts && accounts.length > 0) {
-                        await updateButton(accounts);
-                    }
-                }
-            } catch (wcError) {
-                console.log("WalletConnect not connected:", wcError);
-            }
-
         } catch (error) {
             console.error("Error during wallet state initialization:", error);
         }
@@ -1872,6 +1893,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ===== START APPLICATION =====
     initializeWalletState();
+    preloadWalletConnect(); // Précharger WalletConnect en arrière-plan
 });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

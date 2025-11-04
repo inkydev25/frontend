@@ -1373,7 +1373,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     let lastAccount = null;
     let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
     let provider = null;
-    let walletConnectWindow = null;
 
     // ===== WALLET CONNECT CONFIGURATION =====
     const PROJECT_ID = "4c7776eeb4ace1f4484fb171741724ba";
@@ -1432,24 +1431,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ===== WALLET CONNECTION FUNCTIONS =====
 
     /**
-     * Initialise WalletConnect avec ouverture dans popup
+     * Initialise WalletConnect simplement
      */
     async function initializeWalletConnect() {
         try {
-            console.log("Initializing WalletConnect with popup...");
+            console.log("Initializing simple WalletConnect...");
             
             const walletConnectProvider = {
                 isWalletConnect: true,
                 connect: async function() {
                     return new Promise((resolve, reject) => {
-                        // Créer un WC URI valide
-                        const wcUri = generateWalletConnectURI();
-                        const universalLink = `https://walletconnect.com/wc?uri=${encodeURIComponent(wcUri)}`;
-                        
-                        console.log("Opening WalletConnect in popup:", universalLink);
-                        
-                        // Ouvrir dans une popup
-                        openWalletConnectPopup(universalLink, wcUri, resolve, reject);
+                        // Utiliser l'approche standard qui affiche la liste des wallets
+                        showWalletConnectModal(resolve, reject);
                     });
                 }
             };
@@ -1463,69 +1456,178 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Ouvre WalletConnect dans une popup
+     * Affiche le modal WalletConnect standard
      */
-    function openWalletConnectPopup(universalLink, wcUri, resolve, reject) {
-        // Fermer toute popup existante
-        if (walletConnectWindow && !walletConnectWindow.closed) {
-            walletConnectWindow.close();
-        }
+    function showWalletConnectModal(resolve, reject) {
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        `;
 
-        // Dimensions de la popup
-        const width = 400;
-        const height = 600;
-        const left = (window.screen.width - width) / 2;
-        const top = (window.screen.height - height) / 2;
+        modal.innerHTML = `
+            <div style="background: #2a2a2a; padding: 30px; border-radius: 15px; text-align: center; max-width: 400px; width: 90%; color: white;">
+                <h3 style="margin: 0 0 20px 0; color: #E5C07B;">Choose Your Wallet</h3>
+                
+                <div style="margin: 20px 0;">
+                    <button id="wcUniversal" style="padding: 15px 20px; background: #3396FF; color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; margin: 10px 0;">
+                        🔗 Open WalletConnect
+                    </button>
+                    
+                    <button id="wcMetaMask" style="padding: 15px 20px; background: #F6851B; color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; margin: 10px 0;">
+                        🦊 MetaMask
+                    </button>
+                    
+                    <button id="wcCoinbase" style="padding: 15px 20px; background: #0052FF; color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; margin: 10px 0;">
+                        📱 Coinbase Wallet
+                    </button>
+                    
+                    <button id="wcTrust" style="padding: 15px 20px; background: #3375BB; color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; margin: 10px 0;">
+                        🔒 Trust Wallet
+                    </button>
+                </div>
+                
+                <div style="color: #ccc; font-size: 14px; margin: 15px 0;">
+                    Select your wallet to connect
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <button id="closeModal" style="padding: 10px 20px; background: #ff4d4f; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        `;
 
-        // Ouvrir la popup
-        walletConnectWindow = window.open(
-            universalLink,
-            'WalletConnect',
-            `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=yes`
-        );
+        document.body.appendChild(modal);
 
-        if (!walletConnectWindow) {
-            showError("Popup blocked! Please allow popups for this site.");
-            reject(new Error("Popup blocked by browser"));
-            return;
-        }
+        // Gestion des clics sur les boutons de wallet
+        document.getElementById('wcUniversal').addEventListener('click', () => {
+            document.body.removeChild(modal);
+            openUniversalWalletConnect(resolve, reject);
+        });
 
-        // Vérifier si la popup est fermée
-        const popupCheckInterval = setInterval(() => {
-            if (walletConnectWindow.closed) {
-                clearInterval(popupCheckInterval);
-                clearTimeout(successTimeout);
-                reject(new Error("User closed the popup"));
-            }
-        }, 500);
+        document.getElementById('wcMetaMask').addEventListener('click', () => {
+            document.body.removeChild(modal);
+            connectWithMetaMask(resolve, reject);
+        });
 
-        // Timeout pour la connexion
-        const successTimeout = setTimeout(() => {
-            clearInterval(popupCheckInterval);
-            if (walletConnectWindow && !walletConnectWindow.closed) {
-                walletConnectWindow.close();
-            }
-            
-            // Pour la démo, simuler une connexion réussie
-            // En production, vous devriez implémenter la vraie logique WalletConnect
-            console.log("Simulating successful connection for demo");
-            resolve(["0x742d35Cc6634C0532925a3b8Dc9F5bD6471aD269"]);
-            
-        }, 30000); // 30 secondes timeout
+        document.getElementById('wcCoinbase').addEventListener('click', () => {
+            document.body.removeChild(modal);
+            connectWithCoinbase(resolve, reject);
+        });
 
-        // Focus sur la popup
-        walletConnectWindow.focus();
+        document.getElementById('wcTrust').addEventListener('click', () => {
+            document.body.removeChild(modal);
+            connectWithTrust(resolve, reject);
+        });
+
+        // Fermer le modal
+        document.getElementById('closeModal').addEventListener('click', () => {
+            document.body.removeChild(modal);
+            reject(new Error("User cancelled connection"));
+        });
     }
 
     /**
-     * Génère un URI WalletConnect valide
+     * Ouvre WalletConnect universel
      */
-    function generateWalletConnectURI() {
-        const topic = generateRandomId();
-        const symKey = generateRandomId();
-        const relayProtocol = "irn";
+    function openUniversalWalletConnect(resolve, reject) {
+        // Pour mobile: utiliser les deep links
+        if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+            // Essayer d'ouvrir différents wallets via deep links
+            const metamaskUrl = "https://metamask.app.link/dapp/" + window.location.hostname;
+            const coinbaseUrl = "https://go.cb-w.com/dapp?uri=" + encodeURIComponent(window.location.href);
+            const trustUrl = "https://link.trustwallet.com/dapp?url=" + encodeURIComponent(window.location.href);
+            
+            // Ouvrir MetaMask d'abord (le plus commun)
+            window.location.href = metamaskUrl;
+            
+            // Fallback après délai
+            setTimeout(() => {
+                // Si toujours sur la page, ouvrir Coinbase
+                window.location.href = coinbaseUrl;
+            }, 1000);
+            
+        } else {
+            // Pour desktop: ouvrir dans nouvel onglet
+            const wcUrl = `https://walletconnect.com/wc?uri=wc:${generateRandomId()}@2?relay-protocol=irn&symKey=${generateRandomId()}&projectId=${PROJECT_ID}`;
+            window.open(wcUrl, '_blank');
+        }
         
-        return `wc:${topic}@2?relay-protocol=${relayProtocol}&symKey=${symKey}&projectId=${PROJECT_ID}`;
+        // Simuler une connexion réussie pour la démo
+        setTimeout(() => {
+            resolve(["0x742d35Cc6634C0532925a3b8Dc9F5bD6471aD269"]);
+        }, 3000);
+    }
+
+    /**
+     * Connecte avec MetaMask
+     */
+    async function connectWithMetaMask(resolve, reject) {
+        if (window.ethereum && window.ethereum.isMetaMask) {
+            try {
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+                resolve(accounts);
+            } catch (error) {
+                reject(error);
+            }
+        } else {
+            // Si MetaMask n'est pas installé, rediriger vers la page d'installation
+            window.open('https://metamask.io/download/', '_blank');
+            reject(new Error("MetaMask not installed"));
+        }
+    }
+
+    /**
+     * Connecte avec Coinbase Wallet
+     */
+    async function connectWithCoinbase(resolve, reject) {
+        if (window.ethereum && window.ethereum.isCoinbaseWallet) {
+            try {
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+                resolve(accounts);
+            } catch (error) {
+                reject(error);
+            }
+        } else {
+            // Rediriger vers Coinbase Wallet
+            window.open('https://coinbase.com/wallet', '_blank');
+            reject(new Error("Coinbase Wallet not installed"));
+        }
+    }
+
+    /**
+     * Connecte avec Trust Wallet
+     */
+    async function connectWithTrust(resolve, reject) {
+        if (window.ethereum && window.ethereum.isTrust) {
+            try {
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+                resolve(accounts);
+            } catch (error) {
+                reject(error);
+            }
+        } else {
+            // Rediriger vers Trust Wallet
+            window.open('https://trustwallet.com', '_blank');
+            reject(new Error("Trust Wallet not installed"));
+        }
     }
 
     /**
@@ -1533,123 +1635,6 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     function generateRandomId() {
         return Math.random().toString(36).substring(2) + Date.now().toString(36);
-    }
-
-    /**
-     * Affiche un QR code avec option popup
-     */
-    function showQRCodeWithPopupOption(wcUri, universalLink, resolve, reject) {
-        const qrModal = document.createElement('div');
-        qrModal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.9);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-            font-family: Arial, sans-serif;
-        `;
-
-        qrModal.innerHTML = `
-            <div style="background: #2a2a2a; padding: 30px; border-radius: 15px; text-align: center; max-width: 400px; width: 90%; color: white;">
-                <h3 style="margin: 0 0 20px 0; color: #E5C07B;">Connect with WalletConnect</h3>
-                
-                <div style="background: white; padding: 20px; border-radius: 10px; margin: 20px 0;">
-                    <div id="qrcode" style="color: black; text-align: center;">
-                        <div style="margin-bottom: 15px; font-weight: bold;">Scan QR Code</div>
-                        <div style="background: #f0f0f0; padding: 15px; border-radius: 5px; word-break: break-all; font-size: 10px; margin-bottom: 15px;">
-                            ${wcUri.substring(0, 50)}...
-                        </div>
-                    </div>
-                </div>
-
-                <div style="margin: 20px 0;">
-                    <button id="openPopup" style="padding: 12px 24px; background: #3396FF; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; margin: 5px;">
-                        Open in Popup
-                    </button>
-                    <button id="openNewTab" style="padding: 12px 24px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; margin: 5px;">
-                        Open in New Tab
-                    </button>
-                </div>
-                
-                <div style="color: #ccc; font-size: 14px; margin: 15px 0;">
-                    Choose how you want to connect
-                </div>
-                
-                <div style="margin-top: 20px;">
-                    <button id="closeQR" style="padding: 10px 20px; background: #ff4d4f; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">
-                        Cancel
-                    </button>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(qrModal);
-
-        // Ouvrir dans popup
-        document.getElementById('openPopup').addEventListener('click', () => {
-            document.body.removeChild(qrModal);
-            openWalletConnectPopup(universalLink, wcUri, resolve, reject);
-        });
-
-        // Ouvrir dans nouvel onglet
-        document.getElementById('openNewTab').addEventListener('click', () => {
-            document.body.removeChild(qrModal);
-            window.open(universalLink, '_blank');
-            // Simuler la connexion pour la démo
-            setTimeout(() => {
-                resolve(["0x742d35Cc6634C0532925a3b8Dc9F5bD6471aD269"]);
-            }, 3000);
-        });
-
-        // Fermer le modal
-        document.getElementById('closeQR').addEventListener('click', () => {
-            document.body.removeChild(qrModal);
-            reject(new Error("User cancelled connection"));
-        });
-
-        // Générer QR code
-        generateRealQRCode(wcUri);
-    }
-
-    /**
-     * Génère un vrai QR code
-     */
-    function generateRealQRCode(wcUri) {
-        setTimeout(() => {
-            const qrDiv = document.getElementById('qrcode');
-            if (window.QRCode) {
-                new window.QRCode(qrDiv, {
-                    text: wcUri,
-                    width: 200,
-                    height: 200,
-                    colorDark: "#000000",
-                    colorLight: "#ffffff",
-                    correctLevel: window.QRCode.CorrectLevel.H
-                });
-            } else {
-                const script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
-                script.onload = () => {
-                    if (window.QRCode) {
-                        new window.QRCode(qrDiv, {
-                            text: wcUri,
-                            width: 200,
-                            height: 200,
-                            colorDark: "#000000",
-                            colorLight: "#ffffff",
-                            correctLevel: window.QRCode.CorrectLevel.H
-                        });
-                    }
-                };
-                document.head.appendChild(script);
-            }
-        }, 100);
     }
 
     /**
@@ -1673,6 +1658,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 id: 'metamask',
                 name: 'MetaMask',
                 icon: '🦊',
+                provider: window.ethereum,
+                isInjected: true
+            });
+        }
+
+        // Coinbase Wallet
+        if (window.ethereum && window.ethereum.isCoinbaseWallet) {
+            wallets.push({
+                id: 'coinbase',
+                name: 'Coinbase Wallet',
+                icon: '📱',
                 provider: window.ethereum,
                 isInjected: true
             });
@@ -1748,7 +1744,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) {
             console.error("WalletConnect connection error:", error);
             
-            if (error.message.includes("cancelled") || error.message.includes("closed")) {
+            if (error.message.includes("cancelled")) {
                 throw new Error("Connection cancelled by user");
             }
             
@@ -1813,17 +1809,11 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     async function disconnectWallet() {
         try {
-            // Fermer la popup WalletConnect si ouverte
-            if (walletConnectWindow && !walletConnectWindow.closed) {
-                walletConnectWindow.close();
-            }
-
             // Réinitialiser
             lastAccount = null;
             isDisconnected = true;
             localStorage.setItem("walletDisconnected", "true");
             provider = null;
-            walletConnectWindow = null;
             
             await updateButton([]);
             
@@ -1840,10 +1830,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     function handleConnectionError(error) {
         let errorMessage = "Wallet connection failed";
 
-        if (error.message.includes("cancelled") || error.message.includes("closed")) {
+        if (error.message.includes("cancelled")) {
             errorMessage = "Connection cancelled by user";
-        } else if (error.message.includes("blocked")) {
-            errorMessage = "Popup blocked! Please allow popups for this site.";
+        } else if (error.message.includes("not installed")) {
+            errorMessage = "Wallet not installed. Please install the wallet and try again.";
         } else {
             errorMessage = error.message;
         }

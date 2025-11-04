@@ -1375,14 +1375,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let walletConnectProvider = null;
 
     // ===== WALLET CONNECT CONFIGURATION =====
-    // Pour tester, vous pouvez utiliser ce Project ID public de test (remplacez-le plus tard)
-    const PROJECT_ID = "4c7776eeb4ace1f4484fb171741724ba"; // Project ID de test - à remplacer
-    const WALLET_CONNECT_METADATA = {
-        name: "INKY Tombola",
-        description: "INKY Tombola DApp",
-        url: window.location.origin,
-        icons: ["https://github.com/inkydev25/frontend/blob/main/inky-logo.png"] // Logo générique pour test
-    };
+    const PROJECT_ID = "4c7776eeb4ace1f4484fb171741724ba"; // Project ID de test
 
     // ===== UTILITY FUNCTIONS =====
     
@@ -1400,7 +1393,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function showError(message, duration = 4000) {
-        // Créer un popup d'erreur simple si non existant
         let errorPopup = document.getElementById("errorPopup");
         if (!errorPopup) {
             errorPopup = document.createElement("div");
@@ -1439,50 +1431,51 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ===== WALLET CONNECTION FUNCTIONS =====
 
     /**
-     * Initializes WalletConnect avec fallback
+     * Charge WalletConnect dynamiquement
+     */
+    function loadWalletConnect() {
+        return new Promise((resolve, reject) => {
+            // Vérifier si déjà chargé
+            if (window.WalletConnect) {
+                resolve(window.WalletConnect);
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js';
+            script.onload = () => {
+                if (window.WalletConnect) {
+                    resolve(window.WalletConnect);
+                } else {
+                    reject(new Error('WalletConnect failed to load'));
+                }
+            };
+            script.onerror = () => reject(new Error('Failed to load WalletConnect script'));
+            document.head.appendChild(script);
+        });
+    }
+
+    /**
+     * Initializes WalletConnect
      */
     async function initializeWalletConnect() {
         try {
-            // Méthode 1: Si WalletConnect est déjà disponible globalement
-            if (window.WalletConnectProvider) {
-                console.log("Using global WalletConnectProvider");
-                walletConnectProvider = new window.WalletConnectProvider({
-                    projectId: PROJECT_ID,
-                    chains: [84532], // Base Sepolia
-                    showQrModal: true,
-                    metadata: WALLET_CONNECT_METADATA
-                });
-            } 
-            // Méthode 2: Chargement dynamique
-            else {
-                console.log("Loading WalletConnect dynamically");
-                const script = document.createElement('script');
-                script.src = 'https://unpkg.com/@walletconnect/ethereum-provider@2.10.1/dist/umd/index.min.js';
-                script.onload = async () => {
-                    if (window.WalletConnectProvider) {
-                        walletConnectProvider = new window.WalletConnectProvider({
-                            projectId: PROJECT_ID,
-                            chains: [84532],
-                            showQrModal: true,
-                            metadata: WALLET_CONNECT_METADATA
-                        });
-                    }
-                };
-                document.head.appendChild(script);
-                
-                // Attendre le chargement
-                await new Promise((resolve, reject) => {
-                    script.onload = resolve;
-                    script.onerror = reject;
-                    setTimeout(resolve, 3000); // Timeout après 3s
-                });
-            }
+            console.log("Initializing WalletConnect...");
+            
+            // Charger WalletConnect
+            const WalletConnectProvider = await loadWalletConnect();
+            
+            // Créer le provider
+            walletConnectProvider = new WalletConnectProvider.default({
+                infuraId: "b6c1ad1c6c6e4b8a8c1a2c6c6c6c6c6c", // Infura ID pour Ethereum
+                chainId: 84532, // Base Sepolia
+                qrcode: true,
+                rpc: {
+                    84532: "https://sepolia.base.org"
+                }
+            });
 
-            if (!walletConnectProvider) {
-                throw new Error("WalletConnect not available");
-            }
-
-            // Configurer les événements
+            // Événements
             walletConnectProvider.on("accountsChanged", (accounts) => {
                 console.log("Accounts changed:", accounts);
                 if (accounts.length > 0) {
@@ -1496,35 +1489,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                 console.log("Chain changed:", chainId);
             });
 
-            walletConnectProvider.on("disconnect", (error) => {
-                console.log("WalletConnect disconnected", error);
+            walletConnectProvider.on("disconnect", () => {
+                console.log("WalletConnect disconnected");
                 disconnectWallet();
             });
 
+            console.log("WalletConnect initialized successfully");
             return walletConnectProvider;
 
         } catch (error) {
             console.error("WalletConnect initialization failed:", error);
-            // Fallback: Créer un provider basique pour éviter l'erreur
-            return createFallbackProvider();
+            throw new Error("WalletConnect not available: " + error.message);
         }
     }
 
     /**
-     * Fallback si WalletConnect échoue
-     */
-    function createFallbackProvider() {
-        return {
-            isFallback: true,
-            enable: async () => {
-                throw new Error("WalletConnect not available. Please try another wallet.");
-            },
-            connected: false
-        };
-    }
-
-    /**
-     * Gets available wallets
+     * Gets available wallets - VERSION SIMPLIFIÉE
      */
     function getAvailableWallets() {
         const wallets = [];
@@ -1534,62 +1514,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             id: 'walletconnect',
             name: 'WalletConnect',
             icon: '🔗',
-            description: 'Connect with any mobile wallet',
+            description: 'Connect with mobile wallet',
             isWalletConnect: true
         });
 
-        // MetaMask et autres wallets injectés
-        if (window.ethereum) {
-            const providers = window.ethereum.providers || [window.ethereum];
-            
-            providers.forEach((provider, index) => {
-                const walletName = getWalletName(provider);
-                // Éviter les doublons
-                if (!wallets.some(w => w.name === walletName)) {
-                    wallets.push({
-                        id: `injected-${index}`,
-                        name: walletName,
-                        icon: getWalletIcon(provider),
-                        provider: provider,
-                        isInjected: true
-                    });
-                }
+        // MetaMask
+        if (window.ethereum && window.ethereum.isMetaMask) {
+            wallets.push({
+                id: 'metamask',
+                name: 'MetaMask',
+                icon: '🦊',
+                provider: window.ethereum,
+                isInjected: true
             });
         }
 
-        // Fallback: Si aucun wallet n'est détecté, on garde au moins WalletConnect
-        if (wallets.length === 1) { // Seulement WalletConnect
+        // Autres wallets injectés
+        if (window.ethereum && !window.ethereum.isMetaMask) {
             wallets.push({
-                id: 'no-wallet',
-                name: 'No Wallet Detected',
-                icon: '❌',
-                description: 'Install a wallet like MetaMask or use WalletConnect with a mobile wallet',
-                isDisabled: true
+                id: 'browserwallet',
+                name: 'Browser Wallet',
+                icon: '👛',
+                provider: window.ethereum,
+                isInjected: true
             });
         }
 
         return wallets;
-    }
-
-    function getWalletName(provider) {
-        if (provider.isRabby) return "Rabby Wallet";
-        if (provider.isTrust) return "Trust Wallet"; 
-        if (provider.isCoinbaseWallet) return "Coinbase Wallet";
-        if (provider.isBraveWallet) return "Brave Wallet";
-        if (provider.isPhantom) return "Phantom";
-        if (provider.isMetaMask) return "MetaMask"; 
-        if (provider.isOKXWallet) return "OKX Wallet";
-        if (provider.name) return provider.name;
-        return "Browser Wallet";
-    }
-
-    function getWalletIcon(provider) {
-        if (provider.isMetaMask) return "🦊";
-        if (provider.isCoinbaseWallet) return "📱";
-        if (provider.isTrust) return "🔒";
-        if (provider.isRabby) return "🐇";
-        if (provider.isBraveWallet) return "🦁";
-        return "👛";
     }
 
     /**
@@ -1612,10 +1563,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             button.classList.add('connected');
             isDisconnected = false;
             localStorage.setItem("walletDisconnected", "false");
-            
-            // Mettre à jour le solde et autres infos utilisateur ici
-            await updateUserInfo(account);
-            
         } else {
             button.textContent = 'Connect your wallet';
             button.classList.remove('connected');
@@ -1623,24 +1570,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Mettre à jour les informations utilisateur (à adapter)
-     */
-    async function updateUserInfo(account) {
-        // Placeholder pour la mise à jour des informations utilisateur
-        console.log("User connected:", account);
-        // Ici vous ajouterez vos appels pour récupérer le solde, etc.
-    }
-
-    /**
      * Connects to a specific wallet
      */
     async function connectWallet(wallet) {
         try {
-            if (wallet.isDisabled) {
-                showError("Please install a Web3 wallet like MetaMask or use WalletConnect with a mobile wallet.");
-                return;
-            }
-
             showLoading("Connecting wallet...");
 
             if (wallet.isWalletConnect) {
@@ -1662,33 +1595,34 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Connects using WalletConnect
      */
     async function connectWithWalletConnect() {
-        if (!walletConnectProvider || walletConnectProvider.isFallback) {
-            walletConnectProvider = await initializeWalletConnect();
-        }
-
-        if (walletConnectProvider.isFallback) {
-            throw new Error("WalletConnect is not available. Please try another wallet or check your connection.");
-        }
-
         try {
-            // Vérifier si déjà connecté
-            if (walletConnectProvider.connected) {
-                const accounts = await walletConnectProvider.enable();
-                await updateButton(accounts);
-                return;
+            if (!walletConnectProvider) {
+                await initializeWalletConnect();
             }
 
-            // Nouvelle connexion
             console.log("Enabling WalletConnect...");
-            const accounts = await walletConnectProvider.enable();
-            console.log("WalletConnect connected:", accounts);
-            await updateButton(accounts);
+            
+            // Enable connection
+            await walletConnectProvider.enable();
+            
+            // Get accounts
+            const accounts = await walletConnectProvider.request({
+                method: 'eth_accounts'
+            });
+
+            console.log("WalletConnect accounts:", accounts);
+            
+            if (accounts && accounts.length > 0) {
+                await updateButton(accounts);
+            } else {
+                throw new Error("No accounts received from WalletConnect");
+            }
             
         } catch (error) {
-            console.error("WalletConnect enable error:", error);
+            console.error("WalletConnect connection error:", error);
             
-            if (error?.message?.includes("User closed modal") || 
-                error?.message?.includes("User rejected")) {
+            if (error.message.includes("User closed modal") || 
+                error.message.includes("User denied")) {
                 throw new Error("Connection cancelled by user");
             }
             
@@ -1728,8 +1662,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function disconnectWallet() {
         try {
             // Déconnecter WalletConnect si actif
-            if (walletConnectProvider?.connected) {
+            if (walletConnectProvider) {
                 await walletConnectProvider.disconnect();
+                walletConnectProvider = null;
             }
 
             // Réinitialiser
@@ -1752,11 +1687,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     function handleConnectionError(error) {
         let errorMessage = "Wallet connection failed";
 
-        if (error.message.includes("cancelled") || error.message.includes("rejected")) {
+        if (error.message.includes("cancelled") || error.message.includes("rejected") || error.message.includes("denied")) {
             errorMessage = "Connection cancelled by user";
-        } else if (error.message.includes("WalletConnect is not available")) {
-            errorMessage = "WalletConnect not available. Please try MetaMask or another browser wallet.";
-        } else if (error.message) {
+        } else if (error.message.includes("not available")) {
+            errorMessage = "WalletConnect not available. Please try MetaMask or refresh the page.";
+        } else {
             errorMessage = error.message;
         }
 
@@ -1767,7 +1702,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      * Shows the wallet selection popup
      */
     function showWalletPopup() {
-        popup.innerHTML = '<h3 style="margin: 0 0 15px 0; text-align: center;">Choose Wallet</h3>';
+        popup.innerHTML = '<h3 style="margin: 0 0 15px 0; text-align: center; color: var(--text-color-light);">Choose Wallet</h3>';
         const wallets = getAvailableWallets();
         
         wallets.forEach((wallet) => {
@@ -1791,31 +1726,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                 border: none;
                 border-radius: 10px;
                 color: var(--text-color-light);
-                cursor: ${wallet.isDisabled ? 'not-allowed' : 'pointer'};
-                opacity: ${wallet.isDisabled ? '0.6' : '1'};
+                cursor: pointer;
                 transition: all 0.3s;
             `;
             
-            if (!wallet.isDisabled) {
-                btn.addEventListener('click', async () => {
-                    hideWalletPopup();
-                    await connectWallet(wallet);
-                });
-                
-                btn.onmouseenter = () => {
-                    if (!wallet.isDisabled) {
-                        btn.style.background = '#6C7A89';
-                        btn.style.transform = 'scale(1.02)';
-                    }
-                };
-                
-                btn.onmouseleave = () => {
-                    if (!wallet.isDisabled) {
-                        btn.style.background = 'var(--bg-color-gradient-dark)';
-                        btn.style.transform = 'scale(1)';
-                    }
-                };
-            }
+            btn.addEventListener('click', async () => {
+                hideWalletPopup();
+                await connectWallet(wallet);
+            });
+            
+            btn.onmouseenter = () => {
+                btn.style.background = '#6C7A89';
+                btn.style.transform = 'scale(1.02)';
+            };
+            
+            btn.onmouseleave = () => {
+                btn.style.background = 'var(--bg-color-gradient-dark)';
+                btn.style.transform = 'scale(1)';
+            };
             
             popup.appendChild(btn);
         });
@@ -1840,39 +1768,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function initializeWalletState() {
         console.log("Initializing wallet state...");
         
-        // Vérifier l'état de déconnexion
         if (isDisconnected) {
             await updateButton([]);
             return;
         }
 
         try {
-            // Vérifier WalletConnect d'abord
-            walletConnectProvider = await initializeWalletConnect();
-            if (walletConnectProvider?.connected && !walletConnectProvider.isFallback) {
-                const accounts = await walletConnectProvider.enable();
-                await updateButton(accounts);
-                return;
-            }
-
-            // Vérifier les wallets injectés
+            // Vérifier d'abord les wallets injectés
             if (window.ethereum) {
-                const providers = window.ethereum.providers || [window.ethereum];
-                
-                for (const provider of providers) {
-                    try {
-                        const accounts = await provider.request({ 
-                            method: 'eth_accounts' 
-                        });
-                        if (accounts && accounts.length > 0) {
-                            await updateButton(accounts);
-                            break;
-                        }
-                    } catch (error) {
-                        console.log("Provider accounts check failed:", error);
-                    }
+                const accounts = await window.ethereum.request({ 
+                    method: 'eth_accounts' 
+                });
+                if (accounts && accounts.length > 0) {
+                    await updateButton(accounts);
+                    return;
                 }
             }
+
+            // Ensuite vérifier WalletConnect (plus lent)
+            try {
+                await initializeWalletConnect();
+                if (walletConnectProvider.connected) {
+                    const accounts = await walletConnectProvider.request({
+                        method: 'eth_accounts'
+                    });
+                    if (accounts && accounts.length > 0) {
+                        await updateButton(accounts);
+                    }
+                }
+            } catch (wcError) {
+                console.log("WalletConnect not connected:", wcError);
+            }
+
         } catch (error) {
             console.error("Error during wallet state initialization:", error);
         }

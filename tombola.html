@@ -1362,6 +1362,7 @@
 
     <!-- Main application script -->
 <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@coinbase/wallet-sdk@4.3.0/dist/index.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', async () => {
         // ===== CONSTANTS AND VARIABLES =====
@@ -1370,120 +1371,73 @@
         const overlay = document.getElementById('popupOverlay');
         let lastAccount = null;
         let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
-        let connectionCheckInterval = null;
+        let coinbaseWalletProvider = null;
+
+        // ===== INITIALISATION COINBASE WALLET =====
+        function initializeCoinbaseWallet() {
+            if (typeof CoinbaseWalletSDK === 'undefined') {
+                console.error('Coinbase Wallet SDK not loaded');
+                return null;
+            }
+
+            const coinbaseWallet = new CoinbaseWalletSDK({
+                appName: "INKY Tombola",
+                appLogoUrl: "https://yourdomain.com/inky-logo.png",
+                darkMode: false
+            });
+
+            return coinbaseWallet.makeWeb3Provider({
+                chainId: 8453, // Base network
+                rpc: "https://mainnet.base.org"
+            });
+        }
 
         // ===== WALLET DETECTION FUNCTIONS =====
-
-        /**
-         * Detecte tous les wallets disponibles
-         */
         function detectAllWallets() {
             const wallets = [];
             
-            // Wallets mobiles avec deep links
-            const mobileWallets = [
-                {
+            // MetaMask
+            if (window.ethereum && window.ethereum.isMetaMask) {
+                wallets.push({
                     id: 'metamask',
                     name: 'MetaMask',
-                    type: 'mobile',
-                    deepLink: `https://metamask.app.link/dapp/${window.location.host}${window.location.pathname}`,
-                    packageName: 'io.metamask'
-                },
-                {
-                    id: 'coinbase', 
-                    name: 'Coinbase Wallet',
-                    type: 'mobile',
-                    deepLink: `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(window.location.href)}`,
-                    packageName: 'org.toshi'
-                },
-                {
+                    type: 'injected',
+                    provider: window.ethereum
+                });
+            }
+            
+            // Coinbase Wallet avec SDK
+            wallets.push({
+                id: 'coinbase',
+                name: 'Coinbase Wallet',
+                type: 'coinbase',
+                provider: null
+            });
+            
+            // Trust Wallet
+            if (window.ethereum && window.ethereum.isTrust) {
+                wallets.push({
                     id: 'trust',
-                    name: 'Trust Wallet',
-                    type: 'mobile', 
-                    deepLink: `https://link.trustwallet.com/dapp?url=${encodeURIComponent(window.location.href)}`,
-                    packageName: 'com.wallet.crypto.trustapp'
-                },
-                {
-                    id: 'rainbow',
-                    name: 'Rainbow Wallet',
-                    type: 'mobile',
-                    deepLink: `https://rnbwapp.com/dapp?url=${encodeURIComponent(window.location.href)}`,
-                    packageName: 'me.rainbow'
-                }
-            ];
-            
-            return mobileWallets;
-        }
-
-        /**
-         * Ouvre la wallet dans un popup et démarre la surveillance de connexion
-         */
-        function openWalletPopup(wallet) {
-            // Ouvrir dans un popup
-            const popupWindow = window.open(
-                wallet.deepLink, 
-                'wallet_connect', 
-                'width=400,height=600,scrollbars=yes,resizable=yes'
-            );
-            
-            if (!popupWindow) {
-                showError("Please allow popups for this site");
-                return;
+                    name: 'Trust Wallet', 
+                    type: 'injected',
+                    provider: window.ethereum
+                });
             }
             
-            // Démarrer la surveillance de la connexion
-            startConnectionCheck();
-            
-            // Vérifier si le popup est fermé
-            const popupCheck = setInterval(() => {
-                if (popupWindow.closed) {
-                    clearInterval(popupCheck);
-                    stopConnectionCheck();
-                }
-            }, 1000);
-        }
-
-        /**
-         * Démarre la surveillance périodique de la connexion
-         */
-        function startConnectionCheck() {
-            if (connectionCheckInterval) clearInterval(connectionCheckInterval);
-            
-            connectionCheckInterval = setInterval(async () => {
-                if (window.ethereum) {
-                    try {
-                        const accounts = await window.ethereum.request({ 
-                            method: 'eth_accounts' 
-                        });
-                        
-                        if (accounts && accounts.length > 0) {
-                            // Connexion réussie !
-                            stopConnectionCheck();
-                            isDisconnected = false;
-                            localStorage.setItem("walletDisconnected", "false");
-                            await updateButton(accounts);
-                            showSuccess("Wallet connected successfully!");
-                        }
-                    } catch (error) {
-                        console.error("Connection check error:", error);
-                    }
-                }
-            }, 1000); // Vérifier toutes les secondes
-        }
-
-        /**
-         * Arrête la surveillance de connexion
-         */
-        function stopConnectionCheck() {
-            if (connectionCheckInterval) {
-                clearInterval(connectionCheckInterval);
-                connectionCheckInterval = null;
+            // Wallet générique (fallback)
+            if (window.ethereum && wallets.length === 0) {
+                wallets.push({
+                    id: 'generic',
+                    name: 'Browser Wallet',
+                    type: 'injected', 
+                    provider: window.ethereum
+                });
             }
+            
+            return wallets;
         }
 
-        /**
-         * Met à jour le bouton de connexion
-         */
+        // ===== WALLET CONNECTION FUNCTIONS =====
         async function updateButton(accounts) {
             if (isDisconnected) accounts = [];
             const account = accounts.length > 0 ? accounts[0] : null;
@@ -1499,16 +1453,81 @@
             }
         }
 
-        /**
-         * Affiche le popup de sélection de wallet
-         */
+        async function connectCoinbaseWallet() {
+            try {
+                if (!coinbaseWalletProvider) {
+                    coinbaseWalletProvider = initializeCoinbaseWallet();
+                }
+
+                if (!coinbaseWalletProvider) {
+                    throw new Error('Failed to initialize Coinbase Wallet');
+                }
+
+                // Demander la connexion - cela redirigera vers la page d'approbation Coinbase
+                const accounts = await coinbaseWalletProvider.request({
+                    method: 'eth_requestAccounts'
+                });
+
+                if (accounts && accounts.length > 0) {
+                    isDisconnected = false;
+                    localStorage.setItem("walletDisconnected", "false");
+                    await updateButton(accounts);
+                    
+                    // Écouter les changements de compte
+                    coinbaseWalletProvider.on('accountsChanged', (accounts) => {
+                        updateButton(accounts);
+                    });
+                    
+                    coinbaseWalletProvider.on('chainChanged', (chainId) => {
+                        window.location.reload();
+                    });
+                    
+                    return true;
+                }
+                
+                return false;
+            } catch (error) {
+                console.error('Coinbase Wallet connection error:', error);
+                
+                if (error.code === 4001) {
+                    showError("Connection rejected by user");
+                } else {
+                    showError("Coinbase Wallet connection failed");
+                }
+                return false;
+            }
+        }
+
+        async function connectInjectedWallet(provider) {
+            try {
+                const accounts = await provider.request({ 
+                    method: 'eth_requestAccounts' 
+                });
+                
+                isDisconnected = false;
+                localStorage.setItem("walletDisconnected", "false");
+                await updateButton(accounts);
+                return true;
+            } catch (error) {
+                console.error('Injected wallet connection error:', error);
+                
+                if (error.code === 4001) {
+                    showError("Connection rejected by user");
+                } else {
+                    showError("Wallet connection failed");
+                }
+                return false;
+            }
+        }
+
+        // ===== POPUP MANAGEMENT =====
         function showWalletPopup() {
             popup.innerHTML = '';
             
             const wallets = detectAllWallets();
             
             if (wallets.length === 0) {
-                showError("No wallets available");
+                showError("No EVM wallets detected");
                 return;
             }
             
@@ -1517,9 +1536,14 @@
                 btn.textContent = wallet.name;
                 btn.className = 'wallet-button';
                 
-                btn.addEventListener('click', () => {
+                btn.addEventListener('click', async () => {
                     hideWalletPopup();
-                    openWalletPopup(wallet);
+                    
+                    if (wallet.type === 'coinbase') {
+                        await connectCoinbaseWallet();
+                    } else if (wallet.provider) {
+                        await connectInjectedWallet(wallet.provider);
+                    }
                 });
                 
                 popup.appendChild(btn);
@@ -1529,19 +1553,13 @@
             popup.style.display = 'block';
         }
 
-        /**
-         * Cache le popup wallet
-         */
         function hideWalletPopup() { 
             popup.style.display = 'none'; 
             overlay.style.display = 'none'; 
         }
 
-        /**
-         * Affiche les erreurs
-         */
+        // ===== ERROR HANDLING =====
         function showError(message, duration = 4000) {
-            // Créer ou utiliser le popup d'erreur existant
             let errorPopup = document.getElementById("errorPopup");
             if (!errorPopup) {
                 errorPopup = document.createElement('div');
@@ -1578,68 +1596,43 @@
             }, duration);
         }
 
-        /**
-         * Affiche un message de succès
-         */
-        function showSuccess(message, duration = 3000) {
-            let successPopup = document.getElementById("successPopup");
-            if (!successPopup) {
-                successPopup = document.createElement('div');
-                successPopup.id = 'successPopup';
-                successPopup.style.cssText = `
-                    position: fixed;
-                    top: 20px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    background-color: #52c41a;
-                    color: white;
-                    padding: 12px 24px;
-                    border-radius: 8px;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-                    display: none;
-                    font-family: sans-serif;
-                    font-size: 14px;
-                    text-align: center;
-                    z-index: 10000;
-                `;
-                document.body.appendChild(successPopup);
-            }
-            
-            successPopup.textContent = message;
-            successPopup.style.display = "block";
-            successPopup.style.opacity = 1;
-            
-            setTimeout(() => {
-                successPopup.style.transition = "opacity 0.5s";
-                successPopup.style.opacity = 0;
-                setTimeout(() => { 
-                    successPopup.style.display = "none"; 
-                }, 500);
-            }, duration);
-        }
-
-        // ===== GESTION DES ÉVÉNEMENTS ETHEREUM =====
-
-        /**
-         * Initialise la connexion existante au chargement
-         */
+        // ===== INITIALIZATION =====
         async function initializeExistingConnection() {
-            if (!isDisconnected && window.ethereum) {
+            if (!isDisconnected) {
+                // Vérifier MetaMask/Injected first
+                if (window.ethereum) {
+                    try {
+                        const accounts = await window.ethereum.request({ 
+                            method: 'eth_accounts' 
+                        });
+                        if (accounts.length > 0) {
+                            await updateButton(accounts);
+                            return;
+                        }
+                    } catch (error) {
+                        console.error('Error checking injected connection:', error);
+                    }
+                }
+                
+                // Vérifier Coinbase Wallet
                 try {
-                    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-                    if (accounts.length > 0) {
-                        await updateButton(accounts);
+                    coinbaseWalletProvider = initializeCoinbaseWallet();
+                    if (coinbaseWalletProvider) {
+                        const accounts = await coinbaseWalletProvider.request({
+                            method: 'eth_accounts'
+                        });
+                        if (accounts && accounts.length > 0) {
+                            await updateButton(accounts);
+                        }
                     }
                 } catch (error) {
-                    console.error("Error checking existing connection:", error);
+                    console.error('Error checking Coinbase connection:', error);
                 }
             }
         }
 
-        /**
-         * Écoute les changements de compte
-         */
         function setupAccountListeners() {
+            // Listeners pour MetaMask/injected
             if (window.ethereum) {
                 window.ethereum.on('accountsChanged', (accounts) => {
                     updateButton(accounts);
@@ -1648,38 +1641,23 @@
                 window.ethereum.on('chainChanged', (chainId) => {
                     window.location.reload();
                 });
-                
-                window.ethereum.on('connect', (connectInfo) => {
-                    console.log('Wallet connected:', connectInfo);
-                });
-                
-                window.ethereum.on('disconnect', (error) => {
-                    console.log('Wallet disconnected:', error);
-                    lastAccount = null;
-                    updateButton([]);
-                });
             }
         }
 
-        // ===== GESTION MANUELLE DE LA DÉCONNEXION =====
-
-        /**
-         * Déconnecte le wallet manuellement
-         */
         async function disconnectWallet() {
             lastAccount = null;
             isDisconnected = true;
             localStorage.setItem("walletDisconnected", "true");
             await updateButton([]);
-            stopConnectionCheck();
             
-            // Essaye de déconnecter via Ethereum si possible
-            if (window.ethereum && window.ethereum.disconnect) {
+            // Déconnecter Coinbase Wallet si connecté
+            if (coinbaseWalletProvider) {
                 try {
-                    await window.ethereum.disconnect();
+                    await coinbaseWalletProvider.disconnect();
                 } catch (error) {
-                    console.log("Manual disconnection completed");
+                    console.log('Coinbase Wallet disconnection completed');
                 }
+                coinbaseWalletProvider = null;
             }
         }
 
@@ -1688,36 +1666,15 @@
 
         button.addEventListener('click', () => {
             if (lastAccount) {
-                // Déconnexion
                 disconnectWallet();
                 return;
             }
             showWalletPopup();
         });
 
-        // ===== DÉTECTION AU CHARGEMENT =====
-
-        /**
-         * Vérifie périodiquement si un wallet a été injecté
-         */
-        function startWalletDetection() {
-            const detectionInterval = setInterval(() => {
-                if (window.ethereum && !lastAccount) {
-                    // Un wallet est disponible, vérifier la connexion
-                    initializeExistingConnection();
-                }
-            }, 2000);
-            
-            // Arrêter après 30 secondes
-            setTimeout(() => {
-                clearInterval(detectionInterval);
-            }, 30000);
-        }
-
-        // ===== INITIALISATION =====
+        // ===== START APPLICATION =====
         initializeExistingConnection();
         setupAccountListeners();
-        startWalletDetection();
     });
 </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

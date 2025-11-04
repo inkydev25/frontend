@@ -1375,8 +1375,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let walletConnectProvider = null;
 
     // ===== WALLET CONNECT CONFIGURATION =====
-    // Vous DEVEZ obtenir votre propre Project ID sur https://cloud.walletconnect.com/
-    const PROJECT_ID = "4c7776eeb4ace1f4484fb171741724ba"; // REMPLACEZ-MOI !
+    const PROJECT_ID = "4c7776eeb4ace1f4484fb171741724ba"; // Votre Project ID
 
     // ===== UTILITY FUNCTIONS =====
     
@@ -1432,30 +1431,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ===== WALLET CONNECTION FUNCTIONS =====
 
     /**
-     * Initializes WalletConnect v2 correctly
+     * Charge WalletConnect dynamiquement
+     */
+    function loadWalletConnectLibrary() {
+        return new Promise((resolve, reject) => {
+            if (window.EthereumProvider) {
+                resolve(window.EthereumProvider);
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/@walletconnect/ethereum-provider@2.10.1/dist/umd/index.min.js';
+            script.onload = () => {
+                if (window.EthereumProvider) {
+                    resolve(window.EthereumProvider);
+                } else {
+                    reject(new Error('WalletConnect library loaded but EthereumProvider not found'));
+                }
+            };
+            script.onerror = () => reject(new Error('Failed to load WalletConnect script'));
+            document.head.appendChild(script);
+        });
+    }
+
+    /**
+     * Initializes WalletConnect v2
      */
     async function initializeWalletConnect() {
         try {
-            console.log("Initializing WalletConnect v2...");
+            console.log("Initializing WalletConnect with project ID:", PROJECT_ID);
             
-            // Vérifier si EthereumProvider est disponible
-            if (typeof EthereumProvider === 'undefined') {
-                // Charger le script WalletConnect
-                await new Promise((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = 'https://unpkg.com/@walletconnect/ethereum-provider@2.10.1/dist/umd/index.min.js';
-                    script.onload = resolve;
-                    script.onerror = reject;
-                    document.head.appendChild(script);
-                });
-            }
-
-            // Vérifier à nouveau après chargement
-            if (typeof EthereumProvider === 'undefined') {
-                throw new Error('WalletConnect EthereumProvider not available');
-            }
-
-            // Initialiser le provider avec la configuration correcte
+            // Charger la bibliothèque
+            const EthereumProvider = await loadWalletConnectLibrary();
+            
+            // Initialiser le provider
             walletConnectProvider = await EthereumProvider.init({
                 projectId: PROJECT_ID,
                 chains: [84532], // Base Sepolia
@@ -1466,14 +1475,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                         '--wcm-z-index': '10000'
                     }
                 },
-                methods: [
-                    'eth_sendTransaction',
-                    'eth_signTransaction',
-                    'eth_sign',
-                    'personal_sign',
-                    'eth_signTypedData'
-                ],
-                events: ['chainChanged', 'accountsChanged']
+                metadata: {
+                    name: "INKY Tombola",
+                    description: "INKY Tombola DApp",
+                    url: "https://inkydev25.github.io",
+                    icons: ["https://inkydev25.github.io/frontend/inky-logo.png"]
+                }
             });
 
             // Configurer les écouteurs d'événements
@@ -1495,12 +1502,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                 disconnectWallet();
             });
 
-            console.log("WalletConnect v2 initialized successfully");
+            console.log("WalletConnect initialized successfully");
             return walletConnectProvider;
 
         } catch (error) {
-            console.error("WalletConnect v2 initialization failed:", error);
-            throw new Error("Failed to initialize WalletConnect: " + error.message);
+            console.error("WalletConnect initialization failed:", error);
+            
+            // Message d'erreur plus détaillé
+            let errorMessage = "WalletConnect initialization failed: ";
+            if (error.message.includes("projectId")) {
+                errorMessage += "Invalid Project ID or domain not whitelisted.";
+            } else if (error.message.includes("Failed to load")) {
+                errorMessage += "Failed to load WalletConnect library.";
+            } else {
+                errorMessage += error.message;
+            }
+            
+            throw new Error(errorMessage);
         }
     }
 
@@ -1712,8 +1730,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             error.message.includes("rejected") || 
             error.message.includes("User rejected")) {
             errorMessage = "Connection cancelled by user";
-        } else if (error.message.includes("Failed to initialize")) {
-            errorMessage = "WalletConnect not available. Please check your Project ID.";
+        } else if (error.message.includes("Invalid Project ID") || 
+                   error.message.includes("domain not whitelisted")) {
+            errorMessage = "WalletConnect configuration error. Please check your Project ID and domain whitelisting.";
         } else {
             errorMessage = error.message;
         }
@@ -1819,7 +1838,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Ensuite vérifier WalletConnect
             try {
                 await initializeWalletConnect();
-                if (walletConnectProvider.connected) {
+                if (walletConnectProvider && walletConnectProvider.connected) {
                     const accounts = await walletConnectProvider.request({
                         method: 'eth_accounts'
                     });

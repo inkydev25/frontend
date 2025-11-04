@@ -1368,22 +1368,36 @@
 <!-- WalletConnect SignClient UMD -->
 <script src="https://unpkg.com/@walletconnect/sign-client@2.11.2/dist/umd/index.min.js"></script>
 
+<!-- WalletConnect v2 UMD -->
+<script src="https://unpkg.com/@walletconnect/sign-client@2.11.2/dist/umd/index.min.js"></script>
+
+<!-- QRCode (si tu testes aussi sur PC) -->
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+
+<div id="status" style="padding:10px; font-family:sans-serif; font-size:14px; color:#fff; background:#222; border-radius:10px; margin:10px 0;"></div>
+<div id="walletconnect-qrcode" style="margin-top:20px;"></div>
+<button id="connectWallet" style="padding:10px 20px; background:#4caf50; color:white; border:none; border-radius:8px;">Connect Wallet</button>
+
 <script>
 const PROJECT_ID = "4c7776eeb4ace1f4484fb171741724ba";
-
 let wcClient = null;
 let session = null;
 
+function logStatus(msg) {
+  const el = document.getElementById("status");
+  el.innerHTML += `<div>${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+  console.log(msg); // visible si tu es sur desktop
+}
+
 async function initializeWalletConnect() {
   try {
-    console.log("🟢 Initializing WalletConnect...");
+    logStatus("🔄 Initialisation WalletConnect...");
 
-    // Vérifie que le SDK est bien chargé
     if (!window.WalletConnectSignClient) {
-      throw new Error("WalletConnectSignClient is not available on window");
+      throw new Error("❌ SDK WalletConnect non chargé !");
     }
 
-    // Crée le client
     const SignClient = window.WalletConnectSignClient.default;
     wcClient = await SignClient.init({
       projectId: PROJECT_ID,
@@ -1396,9 +1410,8 @@ async function initializeWalletConnect() {
       }
     });
 
-    console.log("✅ WalletConnect client ready:", wcClient);
+    logStatus("✅ Client WalletConnect prêt.");
 
-    // Démarre la connexion
     const { uri, approval } = await wcClient.connect({
       requiredNamespaces: {
         eip155: {
@@ -1409,26 +1422,23 @@ async function initializeWalletConnect() {
       }
     });
 
-    // Affiche ou envoie le lien selon le device
     if (uri) {
       const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
       if (isMobile) {
         const deepLink = `https://metamask.app.link/wc?uri=${encodeURIComponent(uri)}`;
-        console.log("Opening mobile wallet:", deepLink);
+        logStatus("📱 Ouverture du wallet...");
         window.open(deepLink, "_blank");
       } else {
         showQRCodeOnly(uri);
       }
     }
 
-    // Attendre l'approbation du wallet
+    logStatus("⏳ En attente d'approbation dans ton wallet...");
     session = await approval();
-    console.log("✅ Connected session:", session);
-
-    alert("Wallet connecté !");
+    logStatus("✅ Connexion réussie !");
+    logStatus("👛 Comptes : " + session.namespaces.eip155.accounts.join(", "));
   } catch (err) {
-    console.error("❌ WalletConnect initialization failed:", err);
-    alert("Erreur WalletConnect : " + err.message);
+    logStatus("❌ Erreur WalletConnect : " + err.message);
   }
 }
 
@@ -1443,10 +1453,10 @@ function showQRCodeOnly(uri) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const connectBtn = document.getElementById("connectWallet");
-  connectBtn.addEventListener("click", initializeWalletConnect);
+  document.getElementById("connectWallet").addEventListener("click", initializeWalletConnect);
 });
 </script>
+
 
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

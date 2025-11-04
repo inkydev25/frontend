@@ -1373,6 +1373,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     let lastAccount = null;
     let isDisconnected = localStorage.getItem("walletDisconnected") === "true";
     let provider = null;
+    let walletConnectConnector = null;
+
+    // ===== WALLET CONNECT CONFIGURATION =====
+    const PROJECT_ID = "4c7776eeb4ace1f4484fb171741724ba";
 
     // ===== UTILITY FUNCTIONS =====
     
@@ -1428,106 +1432,229 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ===== WALLET CONNECTION FUNCTIONS =====
 
     /**
-     * Ouvre directement le wallet avec un deep link
+     * Charge la bibliothèque WalletConnect
      */
-    async function openWalletDirectly() {
+    async function loadWalletConnectLibrary() {
         return new Promise((resolve, reject) => {
-            showLoading("Opening wallet...");
-            
-            // Liste des deep links pour les wallets mobiles
-            const walletLinks = [
-                {
-                    name: "MetaMask",
-                    url: `https://metamask.app.link/dapp/${window.location.hostname}${window.location.pathname}`,
-                },
-                {
-                    name: "Coinbase Wallet", 
-                    url: `https://go.cb-w.com/dapp?uri=${encodeURIComponent(window.location.href)}`,
-                },
-                {
-                    name: "Trust Wallet",
-                    url: `https://link.trustwallet.com/dapp?url=${encodeURIComponent(window.location.href)}`,
+            if (window.WalletConnect) {
+                resolve(window.WalletConnect);
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/@walletconnect/client@1.8.0/dist/umd/index.min.js';
+            script.onload = () => {
+                if (window.WalletConnect) {
+                    resolve(window.WalletConnect);
+                } else {
+                    reject(new Error('WalletConnect not loaded'));
                 }
-            ];
-
-            // Ouvrir tous les wallets (l'utilisateur aura celui installé)
-            walletLinks.forEach(wallet => {
-                console.log(`Opening ${wallet.name}...`);
-                window.open(wallet.url, '_blank');
-            });
-
-            // Attendre que l'utilisateur revienne et se connecte
-            waitForConnection(resolve, reject);
+            };
+            script.onerror = reject;
+            document.head.appendChild(script);
         });
     }
 
     /**
-     * Attend que l'utilisateur se connecte après avoir ouvert le wallet
+     * Initialise WalletConnect avec vraie session
      */
-    function waitForConnection(resolve, reject) {
-        console.log("Waiting for user to connect wallet...");
-        
-        let connected = false;
-        const checkInterval = 1000; // Vérifier toutes les secondes
-        const timeout = 120000; // Timeout après 2 minutes
-        
-        const checkConnection = setInterval(() => {
-            if (window.ethereum && window.ethereum.selectedAddress) {
-                // Wallet connecté détecté !
-                connected = true;
-                clearInterval(checkConnection);
-                clearTimeout(timeoutId);
-                
-                console.log("Wallet connected!", window.ethereum.selectedAddress);
-                hideLoading();
-                
-                // Récupérer les comptes
-                window.ethereum.request({ method: 'eth_accounts' })
-                    .then(accounts => {
-                        if (accounts && accounts.length > 0) {
-                            resolve(accounts);
-                        } else {
-                            reject(new Error("No accounts received"));
-                        }
-                    })
-                    .catch(reject);
-            }
-        }, checkInterval);
-
-        // Timeout
-        const timeoutId = setTimeout(() => {
-            if (!connected) {
-                clearInterval(checkConnection);
-                hideLoading();
-                reject(new Error("Connection timeout. Please make sure your wallet is installed and try again."));
-            }
-        }, timeout);
-
-        // Écouter aussi les événements de visibilité (quand l'utilisateur revient)
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                console.log("User returned to page, checking connection...");
-                // Vérifier immédiatement la connexion
-                if (window.ethereum && window.ethereum.selectedAddress && !connected) {
-                    connected = true;
-                    clearInterval(checkConnection);
-                    clearTimeout(timeoutId);
-                    
-                    console.log("Wallet connected after return!");
-                    hideLoading();
-                    
-                    window.ethereum.request({ method: 'eth_accounts' })
-                        .then(accounts => {
-                            if (accounts && accounts.length > 0) {
-                                resolve(accounts);
-                            } else {
-                                reject(new Error("No accounts received"));
-                            }
-                        })
-                        .catch(reject);
+    async function initializeRealWalletConnect() {
+        try {
+            console.log("Initializing real WalletConnect session...");
+            
+            await loadWalletConnectLibrary();
+            
+            // Créer une vraie session WalletConnect
+            walletConnectConnector = new window.WalletConnect.default({
+                bridge: "https://bridge.walletconnect.org", // Bridge officiel
+                clientMeta: {
+                    description: "INKY Tombola DApp",
+                    url: "https://inkydev25.github.io",
+                    icons: ["https://inkydev25.github.io/frontend/inky-logo.png"],
+                    name: "INKY Tombola"
                 }
+            });
+
+            return walletConnectConnector;
+
+        } catch (error) {
+            console.error("WalletConnect initialization failed:", error);
+            throw new Error("WalletConnect not available");
+        }
+    }
+
+    /**
+     * Établit une vraie connexion WalletConnect avec approbation
+     */
+    async function connectWithRealWalletConnect() {
+        let connector;
+        
+        try {
+            showLoading("Creating secure connection...");
+            
+            connector = await initializeRealWalletConnect();
+            
+            // Vérifier si déjà connecté
+            if (connector.connected) {
+                console.log("Already connected:", connector.accounts);
+                hideLoading();
+                return connector.accounts;
             }
+
+            console.log("Creating new WalletConnect session...");
+
+            // Créer une nouvelle session - cela génère un vrai URI
+            await connector.createSession();
+            
+            console.log("Session created, URI:", connector.uri);
+            
+            hideLoading();
+            showLoading("Waiting for approval...");
+
+            // Sur mobile, ouvrir le deep link avec le VRAI URI
+            if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                const deepLink = connector.uri; // C'est le VRAI URI de session
+                console.log("Opening mobile wallet with deep link:", deepLink);
+                window.open(deepLink, '_blank');
+            } else {
+                // Sur desktop: afficher QR code avec le vrai URI
+                showQRCodeOnly(connector.uri, () => {
+                    // Callback quand l'utilisateur ferme le QR code
+                    hideLoading();
+                }, (error) => {
+                    hideLoading();
+                    throw error;
+                });
+            }
+
+            // Attendre l'approbation de l'utilisateur
+            return new Promise((resolve, reject) => {
+                // Écouter l'événement de connexion réussie
+                connector.on("connect", (error, payload) => {
+                    if (error) {
+                        hideLoading();
+                        reject(error);
+                        return;
+                    }
+
+                    console.log("WalletConnect approved!", payload);
+                    const { accounts } = payload.params[0];
+                    hideLoading();
+                    resolve(accounts);
+                });
+
+                // Écouter le rejet
+                connector.on("disconnect", (error) => {
+                    hideLoading();
+                    if (error) {
+                        reject(new Error("Connection rejected by user"));
+                    }
+                });
+
+                // Timeout après 2 minutes
+                setTimeout(() => {
+                    hideLoading();
+                    reject(new Error("Connection timeout. Please approve the request in your wallet."));
+                }, 120000);
+            });
+
+        } catch (error) {
+            hideLoading();
+            throw error;
+        }
+    }
+
+    /**
+     * Affiche UNIQUEMENT le QR code sans lien vers walletconnect.com
+     */
+    function showQRCodeOnly(wcUri, onClose, reject) {
+        const qrModal = document.createElement('div');
+        qrModal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            font-family: Arial, sans-serif;
+        `;
+
+        qrModal.innerHTML = `
+            <div style="background: #2a2a2a; padding: 30px; border-radius: 15px; text-align: center; max-width: 400px; width: 90%; color: white;">
+                <h3 style="margin: 0 0 20px 0; color: #E5C07B;">Scan QR Code with Your Wallet</h3>
+                
+                <div style="background: white; padding: 20px; border-radius: 10px; margin: 20px 0;">
+                    <div id="qrcode" style="color: black; text-align: center;">
+                        <div style="margin-bottom: 15px; font-weight: bold; color: #333;">Scan this QR code with your wallet app</div>
+                        <div style="color: #666; font-size: 12px; margin: 10px 0;">
+                            Open your wallet app and scan the QR code
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="color: #ccc; font-size: 14px; margin: 15px 0;">
+                    Use your wallet app to scan the QR code and approve the connection
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <button id="closeQR" style="padding: 10px 20px; background: #ff4d4f; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(qrModal);
+
+        // Fermer le modal
+        document.getElementById('closeQR').addEventListener('click', () => {
+            document.body.removeChild(qrModal);
+            if (onClose) onClose();
+            if (reject) reject(new Error("User cancelled connection"));
         });
+
+        // Générer le vrai QR code
+        generateRealQRCode(wcUri);
+    }
+
+    /**
+     * Génère un vrai QR code
+     */
+    function generateRealQRCode(wcUri) {
+        setTimeout(() => {
+            const qrDiv = document.getElementById('qrcode');
+            if (window.QRCode) {
+                new window.QRCode(qrDiv, {
+                    text: wcUri,
+                    width: 200,
+                    height: 200,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: window.QRCode.CorrectLevel.H
+                });
+            } else {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js';
+                script.onload = () => {
+                    if (window.QRCode) {
+                        new window.QRCode(qrDiv, {
+                            text: wcUri,
+                            width: 200,
+                            height: 200,
+                            colorDark: "#000000",
+                            colorLight: "#ffffff",
+                            correctLevel: window.QRCode.CorrectLevel.H
+                        });
+                    }
+                };
+                document.head.appendChild(script);
+            }
+        }, 100);
     }
 
     /**
@@ -1625,23 +1752,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Connects using WalletConnect (approche simplifiée)
+     * Connects using WalletConnect
      */
     async function connectWithWalletConnect() {
         try {
-            const accounts = await openWalletDirectly();
+            const accounts = await connectWithRealWalletConnect();
             
-            console.log("Wallet connected with accounts:", accounts);
+            console.log("WalletConnect connected with accounts:", accounts);
 
             if (accounts && accounts.length > 0) {
                 await updateButton(accounts);
-                setupProviderEvents(window.ethereum);
+                
+                // Configurer les événements pour les déconnexions futures
+                if (walletConnectConnector) {
+                    walletConnectConnector.on("disconnect", (error) => {
+                        console.log("WalletConnect disconnected:", error);
+                        disconnectWallet();
+                    });
+                }
             } else {
                 throw new Error("No accounts received");
             }
             
         } catch (error) {
-            console.error("Wallet connection error:", error);
+            console.error("WalletConnect connection error:", error);
             
             if (error.message.includes("cancelled") || error.message.includes("rejected")) {
                 throw new Error("Connection cancelled by user");
@@ -1711,6 +1845,12 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     async function disconnectWallet() {
         try {
+            // Déconnecter WalletConnect si actif
+            if (walletConnectConnector && walletConnectConnector.connected) {
+                await walletConnectConnector.killSession();
+                walletConnectConnector = null;
+            }
+
             // Réinitialiser
             lastAccount = null;
             isDisconnected = true;
@@ -1735,7 +1875,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (error.message.includes("cancelled") || error.message.includes("rejected")) {
             errorMessage = "Connection cancelled by user";
         } else if (error.message.includes("timeout")) {
-            errorMessage = "Connection timeout. Please:\n1. Make sure your wallet app is installed\n2. Open the wallet and approve the connection\n3. Return to this page";
+            errorMessage = "Connection timeout. Please approve the request in your wallet and try again.";
+        } else if (error.message.includes("not available")) {
+            errorMessage = "WalletConnect not available. Please try MetaMask or another wallet.";
         } else {
             errorMessage = error.message;
         }

@@ -1362,7 +1362,6 @@
 
     <!-- Main application script -->
     <script>
-
 // ===== APPLICATION INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', async () => {
     // ===== CONSTANTS AND VARIABLES =====
@@ -1482,26 +1481,59 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Charge le SDK WalletConnect
+     * Charge le SDK WalletConnect avec CDN de secours
      */
     async function loadWalletConnectSDK() {
         return new Promise((resolve, reject) => {
-            if (typeof WalletConnectProvider !== 'undefined') {
+            if (window.WalletConnectProvider) {
+                console.log("WalletConnect SDK already loaded");
                 resolve();
                 return;
             }
 
-            const script = document.createElement('script');
-            script.src = 'https://unpkg.com/@walletconnect/ethereum-provider@2.9.0/dist/umd/index.min.js';
-            script.onload = () => {
-                if (typeof WalletConnectProvider !== 'undefined') {
-                    resolve();
-                } else {
-                    reject(new Error('WalletConnect SDK failed to load'));
+            let loaded = false;
+
+            // Essayer plusieurs CDNs
+            const cdns = [
+                'https://unpkg.com/@walletconnect/ethereum-provider@2.9.0/dist/umd/index.min.js',
+                'https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.9.0/dist/umd/index.min.js',
+                'https://esm.sh/@walletconnect/ethereum-provider@2.9.0'
+            ];
+
+            function tryNextCDN(index) {
+                if (index >= cdns.length) {
+                    reject(new Error('All CDNs failed to load WalletConnect SDK'));
+                    return;
                 }
-            };
-            script.onerror = () => reject(new Error('Failed to load WalletConnect SDK'));
-            document.head.appendChild(script);
+
+                console.log(`Trying CDN: ${cdns[index]}`);
+                const script = document.createElement('script');
+                script.src = cdns[index];
+                
+                script.onload = () => {
+                    if (window.WalletConnectProvider && !loaded) {
+                        loaded = true;
+                        console.log("WalletConnect SDK loaded successfully");
+                        resolve();
+                    }
+                };
+                
+                script.onerror = () => {
+                    console.log(`CDN ${index + 1} failed`);
+                    tryNextCDN(index + 1);
+                };
+                
+                document.head.appendChild(script);
+            }
+
+            tryNextCDN(0);
+
+            // Timeout après 10 secondes
+            setTimeout(() => {
+                if (!loaded) {
+                    reject(new Error('WalletConnect SDK loading timeout'));
+                }
+            }, 10000);
         });
     }
 
@@ -1512,13 +1544,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         let walletConnectProvider = null;
         
         try {
-            showLoading("Loading WalletConnect...");
+            showLoading("Initializing WalletConnect...");
+            console.log("Loading WalletConnect SDK...");
 
             // Charger le SDK
             await loadWalletConnectSDK();
+            console.log("SDK loaded, initializing provider...");
 
             // Créer le provider
-            walletConnectProvider = await WalletConnectProvider.init({
+            walletConnectProvider = await window.WalletConnectProvider.init({
                 projectId: PROJECT_ID,
                 chains: [1], // Ethereum Mainnet
                 showQrModal: true,
@@ -1526,33 +1560,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     name: "INKY Tombola",
                     description: "INKY Tombola DApp",
                     url: window.location.origin,
-                    icons: ["https://inky.org/logo.png"]
-                },
-                qrModalOptions: {
-                    themeMode: "dark",
-                    themeVariables: {
-                        '--wcm-z-index': '10000'
-                    }
+                    icons: ["https://avatars.githubusercontent.com/u/37784886"]
                 }
             });
 
-            // S'abonner aux événements
-            walletConnectProvider.on("display_uri", (uri) => {
-                console.log("WalletConnect URI:", uri);
-            });
-
-            walletConnectProvider.on("connect", (error, payload) => {
-                if (error) throw error;
-                console.log("WalletConnect connected:", payload);
-            });
-
-            walletConnectProvider.on("session_update", (error, payload) => {
-                if (error) throw error;
-                console.log("Session updated:", payload);
-            });
+            console.log("WalletConnect provider initialized");
 
             // Établir la connexion
-            console.log("Enabling WalletConnect...");
+            console.log("Enabling connection...");
             await walletConnectProvider.enable();
 
             // Récupérer les comptes
@@ -1591,7 +1606,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 throw new Error("Connection cancelled by user");
             }
             
-            throw new Error("WalletConnect failed: " + error.message);
+            if (error.message?.includes("Failed to load") || error.message?.includes("loading")) {
+                throw new Error("WalletConnect SDK failed to load. Please refresh the page.");
+            }
+            
+            throw new Error("Connection failed: " + error.message);
         } finally {
             hideLoading();
         }
@@ -1731,8 +1750,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (error.message.includes("cancelled") || 
             error.message.includes("rejected")) {
             errorMessage = "Connection cancelled by user";
-        } else if (error.message.includes("failed to load")) {
-            errorMessage = "Network error. Please check your connection";
+        } else if (error.message.includes("Failed to load")) {
+            errorMessage = "WalletConnect not available. Please refresh the page or try another wallet.";
         } else {
             errorMessage = error.message;
         }

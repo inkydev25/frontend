@@ -1436,7 +1436,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function getAvailableWallets() {
         const wallets = [];
         
-        // WalletConnect - POUR MOBILE AVEC VRAIE APPROVAL
+        // WalletConnect
         wallets.push({
             id: 'walletconnect',
             name: 'WalletConnect',
@@ -1482,63 +1482,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Initialise et connecte avec WalletConnect V2
-     */
-    async function connectWithWalletConnect() {
-        try {
-            showLoading("Initializing WalletConnect...");
-            
-            // Charger le SDK WalletConnect
-            if (typeof WalletConnect !== 'undefined') {
-                await loadWalletConnectSDK();
-            }
-
-            // Créer le provider WalletConnect
-            const provider = new WalletConnectProvider({
-                projectId: PROJECT_ID,
-                chains: [1], // Ethereum Mainnet
-                showQrModal: true, // WalletConnect gère l'UI
-                metadata: {
-                    name: "INKY Tombola",
-                    description: "INKY Tombola DApp",
-                    url: window.location.href,
-                    icons: ["https://inky.org/logo.png"]
-                }
-            });
-
-            // Établir la connexion
-            await provider.enable();
-
-            // Récupérer les comptes
-            const accounts = await provider.request({ method: 'eth_accounts' });
-            
-            console.log("Connected with accounts:", accounts);
-            
-            if (accounts && accounts.length > 0) {
-                await updateButton(accounts);
-                
-                // Sauvegarder le provider pour plus tard
-                window.walletConnectProvider = provider;
-                
-                return accounts;
-            } else {
-                throw new Error("No accounts received");
-            }
-            
-        } catch (error) {
-            console.error("WalletConnect error:", error);
-            
-            if (error.message?.includes("User rejected") || error.message?.includes("Cancelled")) {
-                throw new Error("Connection cancelled by user");
-            }
-            
-            throw new Error("WalletConnect connection failed");
-        } finally {
-            hideLoading();
-        }
-    }
-
-    /**
      * Charge le SDK WalletConnect
      */
     async function loadWalletConnectSDK() {
@@ -1550,10 +1493,108 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const script = document.createElement('script');
             script.src = 'https://unpkg.com/@walletconnect/ethereum-provider@2.9.0/dist/umd/index.min.js';
-            script.onload = resolve;
-            script.onerror = () => reject(new Error("Failed to load WalletConnect"));
+            script.onload = () => {
+                if (typeof WalletConnectProvider !== 'undefined') {
+                    resolve();
+                } else {
+                    reject(new Error('WalletConnect SDK failed to load'));
+                }
+            };
+            script.onerror = () => reject(new Error('Failed to load WalletConnect SDK'));
             document.head.appendChild(script);
         });
+    }
+
+    /**
+     * Initialise et connecte avec WalletConnect V2
+     */
+    async function connectWithWalletConnect() {
+        let walletConnectProvider = null;
+        
+        try {
+            showLoading("Loading WalletConnect...");
+
+            // Charger le SDK
+            await loadWalletConnectSDK();
+
+            // Créer le provider
+            walletConnectProvider = await WalletConnectProvider.init({
+                projectId: PROJECT_ID,
+                chains: [1], // Ethereum Mainnet
+                showQrModal: true,
+                metadata: {
+                    name: "INKY Tombola",
+                    description: "INKY Tombola DApp",
+                    url: window.location.origin,
+                    icons: ["https://inky.org/logo.png"]
+                },
+                qrModalOptions: {
+                    themeMode: "dark",
+                    themeVariables: {
+                        '--wcm-z-index': '10000'
+                    }
+                }
+            });
+
+            // S'abonner aux événements
+            walletConnectProvider.on("display_uri", (uri) => {
+                console.log("WalletConnect URI:", uri);
+            });
+
+            walletConnectProvider.on("connect", (error, payload) => {
+                if (error) throw error;
+                console.log("WalletConnect connected:", payload);
+            });
+
+            walletConnectProvider.on("session_update", (error, payload) => {
+                if (error) throw error;
+                console.log("Session updated:", payload);
+            });
+
+            // Établir la connexion
+            console.log("Enabling WalletConnect...");
+            await walletConnectProvider.enable();
+
+            // Récupérer les comptes
+            const accounts = await walletConnectProvider.request({ 
+                method: 'eth_accounts' 
+            });
+            
+            console.log("Connected accounts:", accounts);
+
+            if (accounts && accounts.length > 0) {
+                await updateButton(accounts);
+                
+                // Sauvegarder le provider
+                window.walletConnectProvider = walletConnectProvider;
+                
+                return accounts;
+            } else {
+                throw new Error("No accounts received");
+            }
+            
+        } catch (error) {
+            console.error("WalletConnect connection error:", error);
+            
+            // Nettoyer en cas d'erreur
+            if (walletConnectProvider) {
+                try {
+                    await walletConnectProvider.disconnect();
+                } catch (e) {
+                    console.error("Error disconnecting:", e);
+                }
+            }
+            
+            if (error.message?.includes("User rejected") || 
+                error.message?.includes("Cancelled") ||
+                error.code === 4001) {
+                throw new Error("Connection cancelled by user");
+            }
+            
+            throw new Error("WalletConnect failed: " + error.message);
+        } finally {
+            hideLoading();
+        }
     }
 
     /**
@@ -1690,6 +1731,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (error.message.includes("cancelled") || 
             error.message.includes("rejected")) {
             errorMessage = "Connection cancelled by user";
+        } else if (error.message.includes("failed to load")) {
+            errorMessage = "Network error. Please check your connection";
         } else {
             errorMessage = error.message;
         }

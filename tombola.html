@@ -1424,22 +1424,81 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, duration);
     }
 
-    // ===== WALLET CONNECTION FUNCTIONS =====
+    // ===== META MASK MOBILE SDK =====
 
     /**
-     * Gets available wallets - SOLUTION SIMPLE
+     * Charge le SDK MetaMask Mobile
+     */
+    async function loadMetaMaskSDK() {
+        return new Promise((resolve, reject) => {
+            if (window.ethereum) {
+                resolve();
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/@metamask/sdk@latest/dist/metamask-sdk.js';
+            script.onload = () => {
+                if (window.MetaMaskSDK) {
+                    resolve();
+                } else {
+                    reject(new Error('MetaMask SDK failed to load'));
+                }
+            };
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+
+    /**
+     * Initialise MetaMask Mobile
+     */
+    async function initializeMetaMaskMobile() {
+        try {
+            await loadMetaMaskSDK();
+
+            const MMSDK = new window.MetaMaskSDK({
+                injectProvider: true,
+                communicationServerUrl: 'https://metamask-sdk-socket.metafi.codefi.network',
+                checkInstallationImmediately: true,
+                dappMetadata: {
+                    name: "INKY Tombola",
+                    url: window.location.hostname,
+                }
+            });
+
+            return MMSDK.getProvider();
+        } catch (error) {
+            console.error("MetaMask Mobile init failed:", error);
+            throw error;
+        }
+    }
+
+    /**
+     * Gets available wallets - FOCUS SUR META MASK MOBILE
      */
     function getAvailableWallets() {
         const wallets = [];
-        
-        // MetaMask
+
+        // MetaMask Mobile (Solution principale)
         wallets.push({
-            id: 'metamask',
-            name: 'MetaMask',
+            id: 'metamask-mobile',
+            name: 'MetaMask Mobile',
             icon: '🦊',
-            provider: window.ethereum,
-            isInjected: true
+            description: 'Recommended for mobile',
+            isMetaMaskMobile: true
         });
+
+        // MetaMask Desktop (si disponible)
+        if (window.ethereum && window.ethereum.isMetaMask) {
+            wallets.push({
+                id: 'metamask-desktop',
+                name: 'MetaMask Desktop',
+                icon: '🦊',
+                provider: window.ethereum,
+                isInjected: true
+            });
+        }
 
         // Coinbase Wallet
         if (window.ethereum && window.ethereum.isCoinbaseWallet) {
@@ -1452,78 +1511,54 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        // Autres wallets injectés
+        // Autres wallets
         if (window.ethereum && !window.ethereum.isMetaMask && !window.ethereum.isCoinbaseWallet) {
             wallets.push({
                 id: 'browserwallet',
                 name: 'Browser Wallet',
-                icon: '👛',
+                icon: '🌐',
                 provider: window.ethereum,
                 isInjected: true
             });
         }
 
-        // WALLETCONNECT SIMPLE - Sans SDK
-        wallets.push({
-            id: 'walletconnect',
-            name: 'WalletConnect',
-            icon: '🔗',
-            description: 'Use WalletConnect app',
-            isWalletConnect: true
-        });
-
         return wallets;
     }
 
     /**
-     * WalletConnect SIMPLE - Sans SDK compliqué
+     * Connecte avec MetaMask Mobile
      */
-    async function connectWithWalletConnectSimple() {
-        return new Promise((resolve, reject) => {
-            try {
-                // Créer une URI WalletConnect basique
-                const wcUri = `wc:${Date.now()}@2?relay-protocol=irn&symKey=${Math.random().toString(36).substring(2)}&projectId=4c7776eeb4ace1f4484fb171741724ba`;
-                
-                // Encoder l'URI
-                const encodedUri = encodeURIComponent(wcUri);
-                
-                // Deep links pour les wallets mobiles
-                const walletDeepLinks = {
-                    'metamask': `metamask://wc?uri=${encodedUri}`,
-                    'trustwallet': `trust://wc?uri=${encodedUri}`,
-                    'rainbow': `rainbow://wc?uri=${encodedUri}`,
-                    'argent': `argent://wc?uri=${encodedUri}`,
-                    'coinbase': `coinbase-wallet://wc?uri=${encodedUri}`
-                };
-                
-                // Lien universel WalletConnect
-                const universalLink = `https://walletconnect.com/wc?uri=${encodedUri}`;
-                
-                console.log("Opening WalletConnect...");
-                
-                // Essayer d'abord MetaMask
-                window.location.href = walletDeepLinks.metamask;
-                
-                // Fallback après délai
-                setTimeout(() => {
-                    if (!document.hidden) {
-                        console.log("Trying universal link...");
-                        window.location.href = universalLink;
-                    }
-                }, 500);
-                
-                // Simuler une connexion réussie (dans la vraie vie, le callback se fait via l'URI)
-                setTimeout(() => {
-                    const demoAccount = ["0x" + Math.random().toString(16).substring(2, 42)];
-                    console.log("Simulated connection:", demoAccount);
-                    resolve(demoAccount);
-                }, 3000);
-                
-            } catch (error) {
-                console.error("WalletConnect simple error:", error);
-                reject(new Error("Failed to open wallet"));
+    async function connectWithMetaMaskMobile() {
+        try {
+            showLoading("Connecting to MetaMask...");
+
+            const provider = await initializeMetaMaskMobile();
+            
+            // Demander la connexion
+            const accounts = await provider.request({
+                method: 'eth_requestAccounts',
+                params: []
+            });
+
+            if (accounts && accounts.length > 0) {
+                await updateButton(accounts);
+                setupProviderEvents(provider);
+                return accounts;
+            } else {
+                throw new Error("No accounts received");
             }
-        });
+
+        } catch (error) {
+            console.error("MetaMask Mobile connection error:", error);
+            
+            if (error.code === 4001) {
+                throw new Error("Connection rejected by user");
+            }
+            
+            throw new Error("MetaMask connection failed: " + error.message);
+        } finally {
+            hideLoading();
+        }
     }
 
     /**
@@ -1546,9 +1581,37 @@ document.addEventListener('DOMContentLoaded', async () => {
             button.classList.add('connected');
             isDisconnected = false;
             localStorage.setItem("walletDisconnected", "false");
+            
+            // Mettre à jour l'interface avec les vraies données
+            updateUIWithWalletData(account);
         } else {
             button.textContent = 'Connect your wallet';
             button.classList.remove('connected');
+        }
+    }
+
+    /**
+     * Met à jour l'interface avec les données du wallet
+     */
+    async function updateUIWithWalletData(account) {
+        try {
+            if (window.ethereum) {
+                // Récupérer le solde
+                const balance = await window.ethereum.request({
+                    method: 'eth_getBalance',
+                    params: [account, 'latest']
+                });
+                
+                // Convertir wei en ETH (exemple)
+                const balanceInEth = parseInt(balance) / 1e18;
+                
+                document.getElementById('inkyBalance').textContent = balanceInEth.toFixed(4);
+                document.getElementById('status').textContent = "Connected";
+                
+                console.log("Wallet data updated:", account, balanceInEth);
+            }
+        } catch (error) {
+            console.error("Error updating wallet data:", error);
         }
     }
 
@@ -1557,24 +1620,20 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     async function connectWallet(wallet) {
         try {
-            if (wallet.isWalletConnect) {
-                showLoading("Opening wallet...");
-                const accounts = await connectWithWalletConnectSimple();
-                await updateButton(accounts);
-                hideLoading();
+            if (wallet.isMetaMaskMobile) {
+                await connectWithMetaMaskMobile();
             } else if (wallet.isInjected) {
                 await connectWithInjected(wallet.provider);
             }
             
         } catch (error) {
-            hideLoading();
             console.error("Wallet connection failed:", error);
             handleConnectionError(error);
         }
     }
 
     /**
-     * Connects using injected provider
+     * Connects using injected provider (Desktop)
      */
     async function connectWithInjected(provider) {
         try {
@@ -1621,6 +1680,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         provider.on('chainChanged', (chainId) => {
             console.log('Chain changed:', chainId);
+            window.location.reload();
         });
 
         provider.on('disconnect', (error) => {
@@ -1642,6 +1702,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             await updateButton([]);
             
+            // Réinitialiser l'interface
+            document.getElementById('inkyBalance').textContent = "-";
+            document.getElementById('yourTickets').textContent = "-";
+            document.getElementById('status').textContent = "Disconnected";
+            
             showError("Wallet disconnected", 2000);
             
         } catch (error) {
@@ -1658,10 +1723,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (error.message.includes("cancelled") || 
             error.message.includes("rejected")) {
             errorMessage = "Connection cancelled by user";
-        } else if (error.message.includes("Failed to open")) {
-            errorMessage = "Please install a wallet app first";
+        } else if (error.message.includes("Failed to load")) {
+            errorMessage = "Please install MetaMask Mobile app";
         } else {
-            errorMessage = "Please try MetaMask or another wallet";
+            errorMessage = error.message;
         }
 
         showError(errorMessage);
@@ -1685,7 +1750,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <span style="font-size: 1.2em; margin-right: 8px;">${wallet.icon}</span>
                 <div style="text-align: left; flex: 1;">
                     <div style="font-weight: bold;">${wallet.name}</div>
-                    ${wallet.description ? `<div style="font-size: 0.8em; opacity: 0.8;">${wallet.description}</div>` : ''}
+                    <div style="font-size: 0.8em; opacity: 0.8;">
+                        ${wallet.description || (wallet.isInjected ? 'Browser' : 'Mobile App')}
+                    </div>
                 </div>
             `;
             

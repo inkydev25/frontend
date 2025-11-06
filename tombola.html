@@ -41,6 +41,38 @@
             overflow: hidden;
         }
 
+        /* Ajoutez ces styles à votre CSS existant */
+
+body {
+    /* Gardez votre gradient existant */
+    background: 
+        /* Votre gradient actuel */
+        linear-gradient(270deg, var(--bg-color-gradient-light), var(--bg-color-main), var(--bg-color-gradient-dark), #6C7A89),
+        /* Nouveau : motif de logos en arrière-plan */
+        url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" opacity="0.1"><image href="NXRA-logo.png" x="0" y="0" width="100" height="100"/><image href="inky-logo.png" x="100" y="0" width="100" height="100"/><image href="inky-logo.png" x="0" y="100" width="100" height="100"/><image href="NXRA-logo.png" x="100" y="100" width="100" height="100"/></svg>');
+    
+    background-size: 
+        800% 800%, /* Pour le gradient */
+        200px 200px; /* Pour le motif de logos */
+    
+    background-position: 
+        0% 50%, /* Pour le gradient */
+        0 0; /* Pour le motif */
+    
+    animation: 
+        gradientBG 20s ease infinite,
+        floatBackground 60s linear infinite;
+}
+
+/* Nouvelle animation pour déplacer le fond */
+@keyframes floatBackground {
+    0% { background-position: 0% 50%, 0 0; }
+    25% { background-position: 100% 50%, 50px 25px; }
+    50% { background-position: 0% 50%, 0 50px; }
+    75% { background-position: 100% 50%, 50px 75px; }
+    100% { background-position: 0% 50%, 0 0; }
+}
+
         /* ===== ANIMATIONS ===== */
         @keyframes gradientBG {
             0% { background-position: 0% 50%; }
@@ -70,7 +102,7 @@
         .floating-logo {
             position: absolute;
             width: 120px;
-            opacity: 0.2;
+            opacity: 0.1;
             pointer-events: none;
             animation: floatSlow 25s ease-in-out infinite;
         }
@@ -1344,6 +1376,18 @@
     <div id="errorPopup"></div>
     
     <!-- Floating logos for background decoration -->
+    <img src="NXRA-logo.png" class="floating-logo" style="top:5%;left:10%; animation-delay:0s;">
+    <img src="inky-logo.png" class="floating-logo" style="top:20%;left:30%; animation-delay:2s;">
+    <img src="NXRA-logo.png" class="floating-logo" style="top:35%;left:50%; animation-delay:4s;">
+    <img src="inky-logo.png" class="floating-logo" style="top:50%;left:70%; animation-delay:6s;">
+    <img src="NXRA-logo.png" class="floating-logo" style="top:65%;left:20%; animation-delay:1s;">
+    <img src="inky-logo.png" class="floating-logo" style="top:70%;left:50%; animation-delay:3s;">
+    <img src="inky-logo.png" class="floating-logo" style="top:10%;left:60%; animation-delay:5s;">
+    <img src="NXRA-logo.png" class="floating-logo" style="top:25%;left:80%; animation-delay:7s;">
+    <img src="NXRA-logo.png" class="floating-logo" style="top:40%;left:15%; animation-delay:2.5s;">
+    <img src="inky-logo.png" class="floating-logo" style="top:55%;left:35%; animation-delay:4.5s;">
+    <img src="NXRA-logo.png" class="floating-logo" style="top:70%;left:80%; animation-delay:6.5s;">
+    <img src="inky-logo.png" class="floating-logo" style="top:70%;left:6%; animation-delay:8s;">
 
     <!-- External libraries -->
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
@@ -2428,36 +2472,6 @@
             initializeData();
             startUpdateIntervals();
         });
-
-
-// Génération dynamique des logos flottants
-function generateFloatingLogos() {
-    const container = document.body;
-    const logos = ['NXRA-logo.png', 'inky-logo.png'];
-    const numberOfLogos = 20; // Augmentez ce nombre selon vos besoins
-    
-    for (let i = 0; i < numberOfLogos; i++) {
-        const logo = document.createElement('img');
-        logo.src = logos[Math.floor(Math.random() * logos.length)];
-        logo.className = 'floating-logo';
-        
-        // Position aléatoire sur toute la hauteur de la page
-        const top = Math.random() * 150; // Jusqu'à 150% de la hauteur
-        const left = Math.random() * 90 + 5; // Entre 5% et 95%
-        const delay = Math.random() * 10; // Délai aléatoire jusqu'à 10s
-        
-        logo.style.cssText = `
-            top: ${top}%;
-            left: ${left}%;
-            animation-delay: ${delay}s;
-        `;
-        
-        container.appendChild(logo);
-    }
-}
-
-// Exécuter quand la page est chargée
-document.addEventListener('DOMContentLoaded', generateFloatingLogos);
     </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>

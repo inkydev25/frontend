@@ -276,11 +276,6 @@
             color: var(--text-color-light);
             opacity: 0.8; 
         }
-        
-        .countdown-timer {
-            font-size: 20px;
-            font-weight: bold;
-        }
 
         .stats-box p, .balance-box p, .last-draw-box p {
             margin: 4px 0;
@@ -619,12 +614,7 @@
                 max-width: 100%;
                 padding: 15px;
             }
-            
-            .button, .total-buy button {
-                width: 180px;
-                padding: 9px 8px;
-            }
-            
+                        
             .page-title {
                 font-size: 20px;
             }
@@ -1197,19 +1187,19 @@
             <h3>💎 Current Round Pool *</h3>
             <div class="pool-amount" id="currentRoundPool">
                 <p><span id="externalWalletBalance">-</span> $INKY</p>
-                <p>* The maximum prize is capped at <span id="maxCap">-</span> $INKY. Any surplus will be burned.</p>
+                <p>* The maximum prize is capped at <span id="maxCap">-</span> $INKY.</p>
             </div>
         </div>
         
         <!-- Countdown section -->
         <div class="info-box countdown-box">
-            <h3>⏳ Next Draw Countdown</h3>
+            <h3>⏳ Next Draw</h3>
             <div class="countdown-timer" id="countdown">00:00:00:00</div>
         </div>
         
         <!-- Stats section -->
         <div class="info-box stats-box">
-            <h3>📊 Current Round Stats</h3>
+            <h3>📊 Current Round</h3>
             <p>Participants: <span id="totalParticipants">-</span></p>
             <p>Tickets sold: <span id="totalTickets">-</span></p>
             <p>$INKY burned: <span id="totalInkyBurned">-</span></p>

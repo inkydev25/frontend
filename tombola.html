@@ -41,38 +41,6 @@
             overflow: hidden;
         }
 
-        /* Ajoutez ces styles à votre CSS existant */
-
-body {
-    /* Gardez votre gradient existant */
-    background: 
-        /* Votre gradient actuel */
-        linear-gradient(270deg, var(--bg-color-gradient-light), var(--bg-color-main), var(--bg-color-gradient-dark), #6C7A89),
-        /* Nouveau : motif de logos en arrière-plan */
-        url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" opacity="0.1"><image href="NXRA-logo.png" x="0" y="0" width="100" height="100"/><image href="inky-logo.png" x="100" y="0" width="100" height="100"/><image href="inky-logo.png" x="0" y="100" width="100" height="100"/><image href="NXRA-logo.png" x="100" y="100" width="100" height="100"/></svg>');
-    
-    background-size: 
-        800% 800%, /* Pour le gradient */
-        200px 200px; /* Pour le motif de logos */
-    
-    background-position: 
-        0% 50%, /* Pour le gradient */
-        0 0; /* Pour le motif */
-    
-    animation: 
-        gradientBG 20s ease infinite,
-        floatBackground 60s linear infinite;
-}
-
-/* Nouvelle animation pour déplacer le fond */
-@keyframes floatBackground {
-    0% { background-position: 0% 50%, 0 0; }
-    25% { background-position: 100% 50%, 50px 25px; }
-    50% { background-position: 0% 50%, 0 50px; }
-    75% { background-position: 100% 50%, 50px 75px; }
-    100% { background-position: 0% 50%, 0 0; }
-}
-
         /* ===== ANIMATIONS ===== */
         @keyframes gradientBG {
             0% { background-position: 0% 50%; }
@@ -102,7 +70,7 @@ body {
         .floating-logo {
             position: absolute;
             width: 120px;
-            opacity: 0.1;
+            opacity: 0.15;
             pointer-events: none;
             animation: floatSlow 25s ease-in-out infinite;
         }
@@ -1388,6 +1356,10 @@ body {
     <img src="inky-logo.png" class="floating-logo" style="top:55%;left:35%; animation-delay:4.5s;">
     <img src="NXRA-logo.png" class="floating-logo" style="top:70%;left:80%; animation-delay:6.5s;">
     <img src="inky-logo.png" class="floating-logo" style="top:70%;left:6%; animation-delay:8s;">
+    <img src="NXRA-logo.png" class="floating-logo" style="top:95%;left:25%; animation-delay:3s;">
+    <img src="inky-logo.png" class="floating-logo" style="top:90%;left:60%; animation-delay:7s;">
+    <img src="NXRA-logo.png" class="floating-logo" style="top:99%;left:70%; animation-delay:4s;">
+    <img src="inky-logo.png" class="floating-logo" style="top:98%;left:15%; animation-delay:2s;">
 
     <!-- External libraries -->
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>

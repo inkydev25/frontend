@@ -36,6 +36,11 @@
             position: relative; 
             overflow-x: hidden; 
         }
+
+        body {
+            overflow: hidden;
+        }
+
         @keyframes gradientBG {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
@@ -55,7 +60,7 @@
         .floating-logo {
             position: absolute;
             width: 120px;
-            opacity: 0.1;
+            opacity: 0.15;
             pointer-events: none;
             animation: floatSlow 25s ease-in-out infinite;
         }
@@ -682,8 +687,8 @@
             }
             
             table th, table td { 
-                padding: 8px 10px; 
-                font-size: 12px; 
+                padding: 2px 2px; 
+                font-size: 11px; 
             }
 
             .toolbox-container {
@@ -706,18 +711,6 @@
             #buttonVesting {
                 width: 100%;
                 margin-top: 10px;
-            }
-
-            #approvalsTable th,
-            #vestingTable th {
-                font-size: 12px;
-                padding: 8px 10px;
-            }
-            
-            #approvalsTable td,
-            #vestingTable td {
-                font-size: 11px;
-                padding: 6px 8px;
             }
         }
         
@@ -782,11 +775,11 @@
             }
             
             table {
-                font-size: 12px;
+                font-size: 11px;
             }
             
             table th, table td {
-                padding: 6px 8px;
+                padding: 2px 2px;
             }
         }
         
@@ -1044,6 +1037,8 @@
     <img src="inky-logo.png" class="floating-logo" style="top:55%;left:35%; animation-delay:4.5s;">
     <img src="NXRA-logo.png" class="floating-logo" style="top:70%;left:80%; animation-delay:6.5s;">
     <img src="inky-logo.png" class="floating-logo" style="top:70%;left:6%; animation-delay:8s;">
+    <img src="NXRA-logo.png" class="floating-logo" style="top:90%;left:70%; animation-delay:4s;">
+    <img src="inky-logo.png" class="floating-logo" style="top:90%;left:25%; animation-delay:1s;">
 
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script> 

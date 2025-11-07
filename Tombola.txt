@@ -1477,7 +1477,7 @@
              */
             async function fetchWinner() {
                 try {
-                    const response = await fetch('http://localhost:3000/winners');
+                    const response = await fetch('https://inky-tombola-api-production.up.railway.app/winners');
                     
                     if (!response.ok) {
                         throw new Error(`Cannot fetch winners: ${response.statusText}`);
@@ -1709,7 +1709,7 @@
                 const tbody = historicalTable.querySelector('tbody');
 
                 try {
-                    const response = await fetch('http://localhost:3000/winners');
+                    const response = await fetch('https://inky-tombola-api-production.up.railway.app/winners');
                     if (!response.ok) {
                         if (loadingMessage) {
                             loadingMessage.textContent = 'Failed to load data.';
@@ -1963,7 +1963,7 @@
                     const wasBlinking = countdownElement && countdownElement.classList.contains('blinking-text');
 
                     // 1. Get draw status
-                    const drawStatusResponse = await fetch('http://localhost:3000/api/draw-status');
+                    const drawStatusResponse = await fetch('https://inky-tombola-api-production.up.railway.app/api/draw-status');
                     const drawStatus = await drawStatusResponse.json();
 
                     // STATE 1: DRAW IN PROGRESS (status === 'en_cours')
@@ -1989,7 +1989,7 @@
                     // *** Removal of reactivation here to avoid blinking ***
                     
                     // 2. Get information to calculate next draw
-                    const drawInfoResponse = await fetch('http://localhost:3000/api/draw-info');
+                    const drawInfoResponse = await fetch('https://inky-tombola-api-production.up.railway.app/api/draw-info');
                     if (!drawInfoResponse.ok) {
                         throw new Error('Failed to fetch draw info');
                     }
@@ -2065,7 +2065,7 @@
                 const mainContainer = document.querySelector('main');
                 
                 try {
-                    const response = await fetch('http://localhost:3000/winners');
+                    const response = await fetch('https://inky-tombola-api-production.up.railway.app/winners');
                     if (!response.ok) {
                         console.error("Failed to fetch data for the chart.");
                         if (loadingMessage) {
@@ -2261,7 +2261,7 @@
              */
             buyButton.addEventListener('click', async () => {
                 try {
-                    const drawStatusResponse = await fetch('http://localhost:3000/api/draw-status');
+                    const drawStatusResponse = await fetch('https://inky-tombola-api-production.up.railway.app/api/draw-status');
                     const drawStatus = await drawStatusResponse.json();
                     
                     if (drawStatus.status === 'en_cours') {
@@ -2435,4 +2435,5 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </body>
+
 </html>

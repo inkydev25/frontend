@@ -1512,7 +1512,7 @@
                     const reportElement = document.getElementById('previousRoundReportLink');
 
                     if (lastWinnerRound > 0) {
-                        const pdfPath = `Draw/archives_rounds_pdf/INKY_Tombola_report_${lastWinnerRound}.pdf`;
+                        const pdfPath = `https://backend-production-b937.up.railway.app/Draw/archives_rounds_pdf/INKY_Tombola_report_${lastWinnerRound}.pdf`;
                         // Transform the span into a hyperlink
                         reportElement.outerHTML = `<a href="${pdfPath}" target="_blank">Report (PDF)</a>`;
                     } else {
@@ -2437,6 +2437,7 @@
 </body>
 
 </html>
+
 
 
 

@@ -618,10 +618,6 @@
             .page-title {
                 font-size: 20px;
             }
-
-            .chart-wrapper {
-                overflow-x: auto !important;
-            }
             
             .page-logo {
                 width: 50px;
@@ -684,6 +680,11 @@
 
             .chart-wrapper {
                 overflow-x: auto !important;
+                overflow-y: hidden;
+            }
+            
+            .chart-container {
+                min-width: 600px;
             }
             
             #how-it-works-link { 
@@ -763,6 +764,12 @@
                 width: 100px;
             }
         }
+
+        @media (max-width: 992px) and (min-width: 768px) {
+            .chart-container {
+                min-width: 800px;
+            }
+        }
         
         /* Mobile devices */
         @media (max-width: 768px) {
@@ -792,10 +799,6 @@
                 gap: 10px;
                 margin-bottom: 0; 
                 order: 1; 
-            }
-
-            .chart-wrapper {
-                overflow-x: auto !important;
             }
             
             .page-title {
@@ -2451,6 +2454,7 @@
 </body>
 
 </html>
+
 
 
 

@@ -1495,17 +1495,17 @@
 
                     if (data.roundid) document.getElementById('lastRound').textContent = data.roundId;
                     if (data.winner) document.getElementById('lastWinner').textContent = data.winner;
-                    if (data.totalTickets !== undefined) document.getElementById('lastTotalTickets').textContent = data.totalTickets;
-                    if (data.numberOfParticipants !== undefined) document.getElementById('lastParticipants').textContent = data.numberOfParticipants;
-                    if (data.bountyTxHash) {
+                    if (data.totaltickets !== undefined) document.getElementById('lastTotalTickets').textContent = data.totalTickets;
+                    if (data.numberofparticipants !== undefined) document.getElementById('lastParticipants').textContent = data.numberOfParticipants;
+                    if (data.bountytxHash) {
                         document.getElementById('lastTxHash').innerHTML = 
                         `<a href="${EXPLORER_BASE_URL}${data.bountyTxHash}" target="_blank" rel="noopener noreferrer">${data.bountyTxHash}</a>`;
                     } else {
                         document.getElementById('lastTxHash').textContent = "-";
                     }
-                    if (data.prizeAmount !== undefined) document.getElementById('lastAmount').textContent = data.prizeAmount;
-                    if (data.burnAmount !== undefined) document.getElementById('lastBurned').textContent = data.burnAmount;
-                    if (data.drawDateUTC !== undefined) document.getElementById('lastDrawDate').textContent = data.drawDateUTC;
+                    if (data.prizeamount !== undefined) document.getElementById('lastAmount').textContent = data.prizeAmount;
+                    if (data.burnamount !== undefined) document.getElementById('lastBurned').textContent = data.burnAmount;
+                    if (data.drawdateutc !== undefined) document.getElementById('lastDrawDate').textContent = data.drawDateUTC;
                     
                     // PDF REPORT HANDLING - Use the last winner's roundId for the report
                     const lastWinnerRound = data.roundId ? Number(data.roundId) : 0;
@@ -2437,6 +2437,7 @@
 </body>
 
 </html>
+
 
 
 

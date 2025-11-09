@@ -2091,10 +2091,10 @@
                         loadingMessage.style.display = 'none';
                     }
 
-                    const sortedWinners = winners.sort((a, b) => a.roundId - b.roundId);
-                    const labels = sortedWinners.map(w => `Round ${w.roundId}`);
-                    const participantData = sortedWinners.map(w => w.numberOfParticipants);
-                    const ticketData = sortedWinners.map(w => w.totalTickets);
+                    const sortedWinners = winners.sort((a, b) => a.roundid - b.roundid);
+                    const labels = sortedWinners.map(w => `Round ${w.roundid}`);
+                    const participantData = sortedWinners.map(w => w.numberofparticipants);
+                    const ticketData = sortedWinners.map(w => w.totaltickets);
 
                     const numberOfRounds = sortedWinners.length;
                     const roundsPerView = 5;
@@ -2437,6 +2437,7 @@
 </body>
 
 </html>
+
 
 
 

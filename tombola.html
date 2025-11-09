@@ -1739,7 +1739,7 @@
                         tr.innerHTML = `
                             <td><span class="addr-abbr" title="${winner.winner}">${winner.winner.substring(0, 6)}...${winner.winner.slice(-4)}</span></td>
                             <td>${parseInt(winner.prizeamount)}</td>
-                            <td>${new Date(winner.drawadateutc).toLocaleDateString()}</td>
+                            <td>${new Date(winner.drawdateutc).toLocaleDateString()}</td>
                         `;
                         tbody.appendChild(tr);
                     });
@@ -2437,6 +2437,7 @@
 </body>
 
 </html>
+
 
 
 

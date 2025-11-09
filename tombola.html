@@ -1497,9 +1497,9 @@
                     if (data.winner) document.getElementById('lastWinner').textContent = data.winner;
                     if (data.totaltickets !== undefined) document.getElementById('lastTotalTickets').textContent = data.totaltickets;
                     if (data.numberofparticipants !== undefined) document.getElementById('lastParticipants').textContent = data.numberofparticipants;
-                    if (data.bountytxHash) {
+                    if (data.bountytxhash) {
                         document.getElementById('lastTxHash').innerHTML = 
-                        `<a href="${EXPLORER_BASE_URL}${data.bountytxHash}" target="_blank" rel="noopener noreferrer">${data.bountytxHash}</a>`;
+                        `<a href="${EXPLORER_BASE_URL}${data.bountytxhash}" target="_blank" rel="noopener noreferrer">${data.bountytxhash}</a>`;
                     } else {
                         document.getElementById('lastTxHash').textContent = "-";
                     }
@@ -2437,6 +2437,7 @@
 </body>
 
 </html>
+
 
 
 

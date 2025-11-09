@@ -1311,7 +1311,7 @@ class WalletManager {
         
         let providers = this.getEVMProviders();
         if (providers.length === 0) {
-            showError("No EVM-compatible wallet detected! Please install one (e.g., MetaMask).");
+            showError("No supported wallet detected!");
             return;
         }
 
@@ -5707,6 +5707,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 </body>
 
 </html>
+
 
 
 

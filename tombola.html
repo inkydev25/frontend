@@ -2233,6 +2233,8 @@
              * Aligns container heights for proper layout
              */
             function alignContainerHeights() { 
+              if (window.innerWidth <= 1400) return;
+                
               const mainContainer = document.querySelector('main');
               const chartBox = document.querySelector('.chart-box');
               const historicalBox = document.querySelector('.historical-box');
@@ -2445,6 +2447,7 @@
 </body>
 
 </html>
+
 
 
 

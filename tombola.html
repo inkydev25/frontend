@@ -2219,41 +2219,35 @@
                 const historicalBox = document.querySelector('.historical-box');
                 const participantsBox = document.querySelector('.participants-box');
                 
+                // Essential check that all elements exist
                 if (!mainContainer || !chartBox || !historicalBox || !participantsBox) return;
             
-                // 1. Obtenir les positions actuelles
+                // 1. Get reference positions
                 const mainContainerTop = mainContainer.getBoundingClientRect().top;
+            
+                // 2. The bottom of the chart is our REFERENCE ALIGNMENT
                 const chartBoxBottom = chartBox.getBoundingClientRect().bottom;
                 const chartBoxBottomRelativeToMain = chartBoxBottom - mainContainerTop;
             
+                // 3. Get the TOP position of the table containers
                 const historicalBoxTopRelativeToMain = historicalBox.getBoundingClientRect().top - mainContainerTop;
                 const participantsBoxTopRelativeToMain = participantsBox.getBoundingClientRect().top - mainContainerTop;
             
-                // 2. Calculer les hauteurs idéales pour l'alignement
+                // 4. Calculate max height: (Chart Bottom) - (Table Top) - (Grid Gap)
                 const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
                 const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
             
-                // 3. RÉSOLUTION DU PROBLÈME : Utiliser la même hauteur pour les 3 conteneurs
-                const minHeight = Math.min(historicalMaxHeight, participantsMaxHeight);
+                // 5. Appliquer les hauteurs calculées - SEULEMENT si elles sont raisonnables
                 const viewportHeight = window.innerHeight;
                 
-                // 4. Limiter la hauteur sans casser l'alignement
-                const maxAllowedHeight = viewportHeight * 0.7; // 70% de la hauteur de la vue
-                const finalHeight = Math.max(200, Math.min(minHeight, maxAllowedHeight)); // entre 200px et 70% de la vue
-            
-                // 5. APPLIQUER LA MÊME HAUTEUR aux trois conteneurs
-                chartBox.style.height = `${finalHeight}px`;
-                historicalBox.style.height = `${finalHeight}px`;
-                participantsBox.style.height = `${finalHeight}px`;
-            
-                // 6. S'assurer que le contenu défile si nécessaire
-                historicalBox.style.overflowY = 'auto';
-                participantsBox.style.overflowY = 'auto';
-                
-                // Pour le chart, s'assurer qu'il garde son aspect responsive
-                const chartWrapper = document.querySelector('.chart-wrapper');
-                if (chartWrapper) {
-                    chartWrapper.style.height = `calc(100% - 40px)`; // ajuster selon votre layout
+                // Si les hauteurs calculées sont trop grandes (plus de 80% de l'écran), on limite
+                if (historicalMaxHeight > viewportHeight * 0.8) {
+                    historicalBox.style.maxHeight = `${viewportHeight * 0.8}px`;
+                    participantsBox.style.maxHeight = `${viewportHeight * 0.8}px`;
+                } else {
+                    // Sinon, on garde le calcul d'alignement original
+                    historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
+                    participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
                 }
             }
             // ===== TICKET PURCHASE FUNCTION =====
@@ -2439,6 +2433,7 @@
 </body>
 
 </html>
+
 
 
 

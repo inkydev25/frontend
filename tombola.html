@@ -622,18 +622,6 @@
             .page-logo {
                 width: 50px;
             }
-
-            .participants-box {
-                max-height: 510px !important; 
-            }
-
-            .historical-box {
-                max-height: 654px !important; 
-            }
-
-            .chart-box {
-                max-height: 350px !important; 
-            }
         }
         
         /* Tablets and small laptops */
@@ -2226,7 +2214,6 @@
              * Aligns container heights for proper layout
              */
             function alignContainerHeights() { 
-                if (window.innerWidth < 1400) return;
                 const mainContainer = document.querySelector('main');
                 const chartBox = document.querySelector('.chart-box');
                 const historicalBox = document.querySelector('.historical-box');
@@ -2438,9 +2425,5 @@
 </body>
 
 </html>
-
-
-
-
 
 

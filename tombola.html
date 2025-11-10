@@ -2237,19 +2237,27 @@
                 const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
                 const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
             
-                // 5. LIMITER LA HAUTEUR MAXIMALE pour éviter l'étirement excessif
-                const viewportHeight = window.innerHeight;
-                const maxAllowedHeight = viewportHeight * 0.6; // 60% de la hauteur de la vue
+                // 5. Appliquer les hauteurs calculées SANS limitation excessive
+                // On garde seulement une sécurité contre les valeurs négatives
+                historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
+                participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
             
-                // 6. Appliquer la hauteur calculée, mais pas plus que le maximum autorisé
-                historicalBox.style.maxHeight = `${Math.max(0, Math.min(historicalMaxHeight, maxAllowedHeight))}px`;
-                participantsBox.style.maxHeight = `${Math.max(0, Math.min(participantsMaxHeight, maxAllowedHeight))}px`;
+                // 6. FORCER le même point de départ en haut pour les trois conteneurs
+                const chartBoxTop = chartBox.getBoundingClientRect().top - mainContainerTop;
                 
-                // 7. Ajuster aussi la hauteur du chart-wrapper si nécessaire
-                const chartWrapper = document.querySelector('.chart-wrapper');
-                if (chartWrapper) {
-                    const chartMaxHeight = viewportHeight * 0.4; // 40% de la hauteur de la vue
-                    chartWrapper.style.maxHeight = `${chartMaxHeight}px`;
+                // S'assurer que tous commencent à la même hauteur
+                chartBox.style.marginTop = '0px';
+                historicalBox.style.marginTop = '0px';
+                participantsBox.style.marginTop = '0px';
+            
+                // 7. Si l'alignement est toujours cassé, utiliser un conteneur parent avec display: flex
+                // Cette partie est optionnelle - à tester si le problème persiste
+                const bottomSection = document.querySelector('.bottom-section'); // ou le conteneur parent approprié
+                if (bottomSection) {
+                    bottomSection.style.display = 'flex';
+                    bottomSection.style.flexDirection = 'row';
+                    bottomSection.style.alignItems = 'flex-start'; // aligner en haut
+                    bottomSection.style.gap = '16px';
                 }
             }
             // ===== TICKET PURCHASE FUNCTION =====
@@ -2435,6 +2443,7 @@
 </body>
 
 </html>
+
 
 
 

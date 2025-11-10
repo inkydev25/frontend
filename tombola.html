@@ -2237,10 +2237,20 @@
                 const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
                 const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
             
-                // 5. Apply calculated height
-                // This max-height activates the scrollbar (overflow-y: auto)
-                historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
-                participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
+                // 5. LIMITER LA HAUTEUR MAXIMALE pour éviter l'étirement excessif
+                const viewportHeight = window.innerHeight;
+                const maxAllowedHeight = viewportHeight * 0.6; // 60% de la hauteur de la vue
+            
+                // 6. Appliquer la hauteur calculée, mais pas plus que le maximum autorisé
+                historicalBox.style.maxHeight = `${Math.max(0, Math.min(historicalMaxHeight, maxAllowedHeight))}px`;
+                participantsBox.style.maxHeight = `${Math.max(0, Math.min(participantsMaxHeight, maxAllowedHeight))}px`;
+                
+                // 7. Ajuster aussi la hauteur du chart-wrapper si nécessaire
+                const chartWrapper = document.querySelector('.chart-wrapper');
+                if (chartWrapper) {
+                    const chartMaxHeight = viewportHeight * 0.4; // 40% de la hauteur de la vue
+                    chartWrapper.style.maxHeight = `${chartMaxHeight}px`;
+                }
             }
             // ===== TICKET PURCHASE FUNCTION =====
 
@@ -2425,6 +2435,7 @@
 </body>
 
 </html>
+
 
 
 

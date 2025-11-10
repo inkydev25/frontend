@@ -2335,6 +2335,8 @@
                 await updateParticipantsTable(roundId, currentPage);
 
                 await setupEvolutionChart();
+
+                setTimeout(alignContainerHeights, 300);
                 
                 await Promise.all([
                     updateWinnersTable(),
@@ -2420,6 +2422,7 @@
 </body>
 
 </html>
+
 
 
 

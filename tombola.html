@@ -2228,38 +2228,38 @@
             }
 
             // ===== CONTAINER ALIGNMENT FUNCTION =====
-
             /**
-             * Aligns container heights for proper layout
+             * Aligns container heights for proper layout (VERSION ROBUSTE)
              */
             function alignContainerHeights() { 
-              const mainContainer = document.querySelector('main');
-              const chartBox = document.querySelector('.chart-box');
-              const historicalBox = document.querySelector('.historical-box');
-              const participantsBox = document.querySelector('.participants-box');
-              
-              // Essential check that all elements exist
-              if (!mainContainer || !chartBox || !historicalBox || !participantsBox) return;
-
-              // 1. Get reference positions
-              const mainContainerTop = mainContainer.getBoundingClientRect().top;
-
-              // 2. The bottom of the chart is our REFERENCE ALIGNMENT
-              const chartBoxBottom = chartBox.getBoundingClientRect().bottom;
-              const chartBoxBottomRelativeToMain = chartBoxBottom - mainContainerTop;
-
-              // 3. Get the TOP position of the table containers
-              const historicalBoxTopRelativeToMain = historicalBox.getBoundingClientRect().top - mainContainerTop;
-              const participantsBoxTopRelativeToMain = participantsBox.getBoundingClientRect().top - mainContainerTop;
-
-              // 4. Calculate max height: (Chart Bottom) - (Table Top) - (Grid Gap)
-              const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
-              const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
-
-              // 5. Apply calculated height
-              // This max-height activates the scrollbar (overflow-y: auto)
-              historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
-              participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
+                const mainContainer = document.querySelector('main');
+                const chartBox = document.querySelector('.chart-box');
+                const historicalBox = document.querySelector('.historical-box');
+                const participantsBox = document.querySelector('.participants-box');
+                
+                if (!mainContainer || !chartBox || !historicalBox || !participantsBox) return;
+            
+                // Réinitialiser temporairement les hauteurs pour un calcul propre
+                historicalBox.style.maxHeight = 'none';
+                participantsBox.style.maxHeight = 'none';
+            
+                // Forcer un reflow pour que le navigateur recalcule les positions
+                void mainContainer.offsetHeight;
+            
+                // Recalculer les positions
+                const mainContainerTop = mainContainer.getBoundingClientRect().top;
+                const chartBoxBottom = chartBox.getBoundingClientRect().bottom;
+                const chartBoxBottomRelativeToMain = chartBoxBottom - mainContainerTop;
+            
+                const historicalBoxTopRelativeToMain = historicalBox.getBoundingClientRect().top - mainContainerTop;
+                const participantsBoxTopRelativeToMain = participantsBox.getBoundingClientRect().top - mainContainerTop;
+            
+                const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
+                const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
+            
+                // Appliquer les nouvelles hauteurs
+                historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
+                participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
             }
 
             // ===== TICKET PURCHASE FUNCTION =====
@@ -2445,5 +2445,6 @@
 </body>
 
 </html>
+
 
 

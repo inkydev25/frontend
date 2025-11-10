@@ -614,7 +614,7 @@
                 max-width: 100%;
                 padding: 15px;
             }
-
+                        
             .page-title {
                 font-size: 20px;
             }
@@ -2232,35 +2232,34 @@
             /**
              * Aligns container heights for proper layout
              */
-            function alignContainerHeights() {
-                const mainContainer = document.querySelector('main');
-                const chartBox = document.querySelector('.chart-box');
-                const historicalBox = document.querySelector('.historical-box');
-                const participantsBox = document.querySelector('.participants-box');
-                
-                if (!mainContainer || !chartBox || !historicalBox || !participantsBox) return;
-            
-                const maxAllowedHeight = window.innerHeight * 0.7;
-                const mainContainerTop = mainContainer.getBoundingClientRect().top;
-                const chartBoxBottom = chartBox.getBoundingClientRect().bottom;
-                const chartBoxBottomRelativeToMain = chartBoxBottom - mainContainerTop;
-            
-                // UTILISER LA MÊME POSITION DE DÉPART POUR LES DEUX
-                const participantsBoxTopRelativeToMain = participantsBox.getBoundingClientRect().top - mainContainerTop;
-            
-                // Forcer historical à commencer à la même hauteur que participants
-                const historicalMaxHeight = Math.min(
-                    chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8, // Même top que participants
-                    maxAllowedHeight
-                );
-                
-                const participantsMaxHeight = Math.min(
-                    chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8,
-                    maxAllowedHeight
-                );
-            
-                historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
-                participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
+            function alignContainerHeights() { 
+              const mainContainer = document.querySelector('main');
+              const chartBox = document.querySelector('.chart-box');
+              const historicalBox = document.querySelector('.historical-box');
+              const participantsBox = document.querySelector('.participants-box');
+              
+              // Essential check that all elements exist
+              if (!mainContainer || !chartBox || !historicalBox || !participantsBox) return;
+
+              // 1. Get reference positions
+              const mainContainerTop = mainContainer.getBoundingClientRect().top;
+
+              // 2. The bottom of the chart is our REFERENCE ALIGNMENT
+              const chartBoxBottom = chartBox.getBoundingClientRect().bottom;
+              const chartBoxBottomRelativeToMain = chartBoxBottom - mainContainerTop;
+
+              // 3. Get the TOP position of the table containers
+              const historicalBoxTopRelativeToMain = historicalBox.getBoundingClientRect().top - mainContainerTop;
+              const participantsBoxTopRelativeToMain = participantsBox.getBoundingClientRect().top - mainContainerTop;
+
+              // 4. Calculate max height: (Chart Bottom) - (Table Top) - (Grid Gap)
+              const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
+              const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
+
+              // 5. Apply calculated height
+              // This max-height activates the scrollbar (overflow-y: auto)
+              historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
+              participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
             }
 
             // ===== TICKET PURCHASE FUNCTION =====
@@ -2446,61 +2445,5 @@
 </body>
 
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

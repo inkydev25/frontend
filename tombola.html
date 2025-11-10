@@ -2199,7 +2199,7 @@
                     }
                     
                     // Appeler alignContainerHeights une fois le chart rendu
-                    handleZoomAndResize();
+                    alignContainerHeights();
             
                 } catch (error) {
                     console.error("Error fetching or rendering chart data:", error);
@@ -2237,41 +2237,10 @@
                 const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
                 const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
             
-                // 5. APPLIQUER DIRECTEMENT le calcul d'alignement (votre version initiale)
+                // 5. Apply calculated height
+                // This max-height activates the scrollbar (overflow-y: auto)
                 historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
                 participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
-            
-                // 6. FORCER un redraw pour s'assurer que le rendu est propre
-                void historicalBox.offsetHeight;
-                void participantsBox.offsetHeight;
-            }
-            
-            /**
-             * Handles zoom and resize events properly
-             */
-            function handleZoomAndResize() {
-                // Réinitialiser les transitions temporairement pour éviter les effets de "glitch"
-                const historicalBox = document.querySelector('.historical-box');
-                const participantsBox = document.querySelector('.participants-box');
-                const chartBox = document.querySelector('.chart-box');
-                
-                [historicalBox, participantsBox, chartBox].forEach(box => {
-                    if (box) {
-                        box.style.transition = 'none';
-                    }
-                });
-            
-                // Recalculer l'alignement
-                alignContainerHeights();
-            
-                // Restaurer les transitions après un court délai
-                setTimeout(() => {
-                    [historicalBox, participantsBox, chartBox].forEach(box => {
-                        if (box) {
-                            box.style.transition = '';
-                        }
-                    });
-                }, 100);
             }
             // ===== TICKET PURCHASE FUNCTION =====
 
@@ -2438,17 +2407,14 @@
                 showWalletPopup();
             });
 
+            // Ensure the function is called AFTER everything is rendered
             window.addEventListener('load', () => {
-                setTimeout(handleZoomAndResize, 100);
+                // A slight delay is often needed after 'load' for complex elements (like Chart.js)
+                setTimeout(alignContainerHeights, 100); 
             });
-            window.onresize = handleZoomAndResize;
-            
-            // Ajouter aussi un listener pour le zoom
-            window.addEventListener('wheel', (e) => {
-                if (e.ctrlKey) { // Ctrl + scroll = zoom
-                    setTimeout(handleZoomAndResize, 100);
-                }
-            });
+
+            // Important: recall the function on resize
+            window.onresize = alignContainerHeights;
 
             // ===== START APPLICATION =====
             initializeData();
@@ -2459,11 +2425,5 @@
 </body>
 
 </html>
-
-
-
-
-
-
 
 

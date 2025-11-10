@@ -622,6 +622,23 @@
             .page-logo {
                 width: 50px;
             }
+
+            .last-draw-box {
+                height: 350px;
+                overflow-y: auto;
+            }
+
+            .participants-box {
+                height: 480px;
+            }
+
+            .historical-box {
+                height: 550px;
+            }
+
+            .chart-box {
+                height: 300px;
+            }     
         }
         
         /* Tablets and small laptops */
@@ -2214,6 +2231,7 @@
              * Aligns container heights for proper layout
              */
             function alignContainerHeights() { 
+                if (window.innerWidth < 1400) return;
                 const mainContainer = document.querySelector('main');
                 const chartBox = document.querySelector('.chart-box');
                 const historicalBox = document.querySelector('.historical-box');
@@ -2425,5 +2443,6 @@
 </body>
 
 </html>
+
 
 

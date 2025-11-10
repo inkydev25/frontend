@@ -705,8 +705,22 @@
                 outline: none;
             }
 
+            .chart-box {
+                overflow: hidden;
+            }
+            
             .chart-wrapper {
                 height: 250px;
+                overflow-x: auto;
+                overflow-y: hidden;
+            }
+            
+            .chart-container {
+                min-width: min-content;
+            }
+            
+            canvas#evolutionChart {
+                min-width: 600px; /* ou la largeur minimale nécessaire */
             }
             
             .total-buy {
@@ -2435,6 +2449,7 @@
 </body>
 
 </html>
+
 
 
 

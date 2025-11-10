@@ -2201,22 +2201,8 @@
                         chartWrapper.scrollLeft = scrollOffset;
                     }
                     
-                    // Alignment calculation is now done without delay
-                    const chartBox = document.querySelector('.chart-box');
-                    if (!chartBox) return;
-
-                    const chartBoxBottom = chartBox.getBoundingClientRect().bottom;
-                    const mainContainerTop = mainContainer.getBoundingClientRect().top;
-                    const chartBoxBottomRelativeToMain = chartBoxBottom - mainContainerTop;
-
-                    const historicalBoxTopRelativeToMain = historicalBox.getBoundingClientRect().top - mainContainerTop;
-                    const participantsBoxTopRelativeToMain = participantsBox.getBoundingClientRect().top - mainContainerTop;
-
-                    const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
-                    const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
-
-                    historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
-                    participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
+                    // Call the debounced alignment function
+                    setTimeout(alignContainerHeights, 100);
 
                 } catch (error) {
                     console.error("Error fetching or rendering chart data:", error);
@@ -2231,7 +2217,11 @@
             /**
              * Aligns container heights for proper layout (VERSION ROBUSTE)
              */
-            function alignContainerHeights() { 
+            let alignTimeout;
+            
+            function alignContainerHeights() {
+              clearTimeout(alignTimeout);
+              alignTimeout = setTimeout(() => {
                 const mainContainer = document.querySelector('main');
                 const chartBox = document.querySelector('.chart-box');
                 const historicalBox = document.querySelector('.historical-box');
@@ -2239,14 +2229,6 @@
                 
                 if (!mainContainer || !chartBox || !historicalBox || !participantsBox) return;
             
-                // Réinitialiser temporairement les hauteurs pour un calcul propre
-                historicalBox.style.maxHeight = 'none';
-                participantsBox.style.maxHeight = 'none';
-            
-                // Forcer un reflow pour que le navigateur recalcule les positions
-                void mainContainer.offsetHeight;
-            
-                // Recalculer les positions
                 const mainContainerTop = mainContainer.getBoundingClientRect().top;
                 const chartBoxBottom = chartBox.getBoundingClientRect().bottom;
                 const chartBoxBottomRelativeToMain = chartBoxBottom - mainContainerTop;
@@ -2257,11 +2239,10 @@
                 const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
                 const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
             
-                // Appliquer les nouvelles hauteurs
                 historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
                 participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
+              }, 50);
             }
-
             // ===== TICKET PURCHASE FUNCTION =====
 
             /**
@@ -2429,12 +2410,21 @@
 
             // Ensure the function is called AFTER everything is rendered
             window.addEventListener('load', () => {
-                // A slight delay is often needed after 'load' for complex elements (like Chart.js)
-                setTimeout(alignContainerHeights, 100); 
+                setTimeout(alignContainerHeights, 200); 
             });
-
-            // Important: recall the function on resize
-            window.onresize = alignContainerHeights;
+            
+            // Debounced resize and scroll events
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(alignContainerHeights, 100);
+            });
+            
+            let scrollTimeout;
+            window.addEventListener('scroll', () => {
+                clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(alignContainerHeights, 150);
+            }, { passive: true });
 
             // ===== START APPLICATION =====
             initializeData();
@@ -2445,6 +2435,7 @@
 </body>
 
 </html>
+
 
 
 

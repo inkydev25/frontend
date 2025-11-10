@@ -2068,9 +2068,6 @@
                 const loadingMessage = document.querySelector('.chart-loading-message');
                 const chartWrapper = document.querySelector('.chart-wrapper');
                 const canvas = document.getElementById('evolutionChart');
-                const historicalBox = document.querySelector('.historical-box');
-                const participantsBox = document.querySelector('.participants-box');
-                const mainContainer = document.querySelector('main');
                 
                 try {
                     const response = await fetch('https://backend-production-4cb0c.up.railway.app/winners');
@@ -2082,7 +2079,7 @@
                         }
                         return;
                     }
-
+            
                     const winners = await response.json();
                     
                     if (winners.length === 0) {
@@ -2094,30 +2091,30 @@
                         }
                         return;
                     }
-
+            
                     if (loadingMessage) {
                         loadingMessage.style.display = 'none';
                     }
-
+            
                     const sortedWinners = winners.sort((a, b) => a.roundid - b.roundid);
                     const labels = sortedWinners.map(w => `Round ${w.roundid}`);
                     const participantData = sortedWinners.map(w => w.numberofparticipants);
                     const ticketData = sortedWinners.map(w => w.totaltickets);
-
+            
                     const numberOfRounds = sortedWinners.length;
                     const roundsPerView = 5;
                     const baseWidthPerRound = 120;
                     const effectiveWidth = Math.max(roundsPerView * baseWidthPerRound, numberOfRounds * baseWidthPerRound);
-
+            
                     canvas.width = effectiveWidth;
                     canvas.height = chartWrapper.clientHeight;
-
+            
                     const ctx = canvas.getContext('2d');
-
+            
                     if (window.myEvolutionChart instanceof Chart) {
                         window.myEvolutionChart.destroy();
                     }
-
+            
                     window.myEvolutionChart = new Chart(ctx, {
                         type: 'line',
                         data: {
@@ -2195,29 +2192,15 @@
                             }
                         }
                     });
-
+            
                     if (chartWrapper && numberOfRounds > roundsPerView) {
                         const scrollOffset = effectiveWidth - chartWrapper.clientWidth;
                         chartWrapper.scrollLeft = scrollOffset;
                     }
                     
-                    // Alignment calculation is now done without delay
-                    const chartBox = document.querySelector('.chart-box');
-                    if (!chartBox) return;
-
-                    const chartBoxBottom = chartBox.getBoundingClientRect().bottom;
-                    const mainContainerTop = mainContainer.getBoundingClientRect().top;
-                    const chartBoxBottomRelativeToMain = chartBoxBottom - mainContainerTop;
-
-                    const historicalBoxTopRelativeToMain = historicalBox.getBoundingClientRect().top - mainContainerTop;
-                    const participantsBoxTopRelativeToMain = participantsBox.getBoundingClientRect().top - mainContainerTop;
-
-                    const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
-                    const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
-
-                    historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
-                    participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
-
+                    // Appeler alignContainerHeights une fois le chart rendu
+                    alignContainerHeights();
+            
                 } catch (error) {
                     console.error("Error fetching or rendering chart data:", error);
                     if (loadingMessage) {
@@ -2226,42 +2209,39 @@
                     }
                 }
             }
-
-            // ===== CONTAINER ALIGNMENT FUNCTION =====
-
+            
             /**
              * Aligns container heights for proper layout
              */
             function alignContainerHeights() { 
-              const mainContainer = document.querySelector('main');
-              const chartBox = document.querySelector('.chart-box');
-              const historicalBox = document.querySelector('.historical-box');
-              const participantsBox = document.querySelector('.participants-box');
-              
-              // Essential check that all elements exist
-              if (!mainContainer || !chartBox || !historicalBox || !participantsBox) return;
-
-              // 1. Get reference positions
-              const mainContainerTop = mainContainer.getBoundingClientRect().top;
-
-              // 2. The bottom of the chart is our REFERENCE ALIGNMENT
-              const chartBoxBottom = chartBox.getBoundingClientRect().bottom;
-              const chartBoxBottomRelativeToMain = chartBoxBottom - mainContainerTop;
-
-              // 3. Get the TOP position of the table containers
-              const historicalBoxTopRelativeToMain = historicalBox.getBoundingClientRect().top - mainContainerTop;
-              const participantsBoxTopRelativeToMain = participantsBox.getBoundingClientRect().top - mainContainerTop;
-
-              // 4. Calculate max height: (Chart Bottom) - (Table Top) - (Grid Gap)
-              const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
-              const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
-
-              // 5. Apply calculated height
-              // This max-height activates the scrollbar (overflow-y: auto)
-              historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
-              participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
+                const mainContainer = document.querySelector('main');
+                const chartBox = document.querySelector('.chart-box');
+                const historicalBox = document.querySelector('.historical-box');
+                const participantsBox = document.querySelector('.participants-box');
+                
+                // Essential check that all elements exist
+                if (!mainContainer || !chartBox || !historicalBox || !participantsBox) return;
+            
+                // 1. Get reference positions
+                const mainContainerTop = mainContainer.getBoundingClientRect().top;
+            
+                // 2. The bottom of the chart is our REFERENCE ALIGNMENT
+                const chartBoxBottom = chartBox.getBoundingClientRect().bottom;
+                const chartBoxBottomRelativeToMain = chartBoxBottom - mainContainerTop;
+            
+                // 3. Get the TOP position of the table containers
+                const historicalBoxTopRelativeToMain = historicalBox.getBoundingClientRect().top - mainContainerTop;
+                const participantsBoxTopRelativeToMain = participantsBox.getBoundingClientRect().top - mainContainerTop;
+            
+                // 4. Calculate max height: (Chart Bottom) - (Table Top) - (Grid Gap)
+                const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
+                const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
+            
+                // 5. Apply calculated height
+                // This max-height activates the scrollbar (overflow-y: auto)
+                historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
+                participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
             }
-
             // ===== TICKET PURCHASE FUNCTION =====
 
             /**
@@ -2445,5 +2425,6 @@
 </body>
 
 </html>
+
 
 

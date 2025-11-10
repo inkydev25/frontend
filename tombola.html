@@ -2201,8 +2201,22 @@
                         chartWrapper.scrollLeft = scrollOffset;
                     }
                     
-                    // Call the debounced alignment function
-                    setTimeout(alignContainerHeights, 100);
+                    // Alignment calculation is now done without delay
+                    const chartBox = document.querySelector('.chart-box');
+                    if (!chartBox) return;
+
+                    const chartBoxBottom = chartBox.getBoundingClientRect().bottom;
+                    const mainContainerTop = mainContainer.getBoundingClientRect().top;
+                    const chartBoxBottomRelativeToMain = chartBoxBottom - mainContainerTop;
+
+                    const historicalBoxTopRelativeToMain = historicalBox.getBoundingClientRect().top - mainContainerTop;
+                    const participantsBoxTopRelativeToMain = participantsBox.getBoundingClientRect().top - mainContainerTop;
+
+                    const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
+                    const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
+
+                    historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
+                    participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
 
                 } catch (error) {
                     console.error("Error fetching or rendering chart data:", error);
@@ -2214,41 +2228,40 @@
             }
 
             // ===== CONTAINER ALIGNMENT FUNCTION =====
+
             /**
-             * Aligns container heights for proper layout (VERSION ROBUSTE)
+             * Aligns container heights for proper layout
              */
-            let alignTimeout;
-            
-            function alignContainerHeights() {
-                const mainContainer = document.querySelector('main');
-                const chartBox = document.querySelector('.chart-box');
-                const historicalBox = document.querySelector('.historical-box');
-                const participantsBox = document.querySelector('.participants-box');
-                
-                if (!mainContainer || !chartBox || !historicalBox || !participantsBox) return;
-            
-                // RÉINITIALISER les hauteurs avant de calculer
-                historicalBox.style.maxHeight = 'none';
-                participantsBox.style.maxHeight = 'none';
-            
-                // Forcer le recalcul des positions
-                void mainContainer.offsetHeight;
-            
-                // Maintenant calculer les nouvelles hauteurs
-                const mainContainerTop = mainContainer.getBoundingClientRect().top;
-                const chartBoxBottom = chartBox.getBoundingClientRect().bottom;
-                const chartBoxBottomRelativeToMain = chartBoxBottom - mainContainerTop;
-            
-                const historicalBoxTopRelativeToMain = historicalBox.getBoundingClientRect().top - mainContainerTop;
-                const participantsBoxTopRelativeToMain = participantsBox.getBoundingClientRect().top - mainContainerTop;
-            
-                const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
-                const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
-            
-                // Appliquer les NOUVELLES hauteurs
-                historicalBox.style.maxHeight = `${Math.max(100, historicalMaxHeight)}px`;
-                participantsBox.style.maxHeight = `${Math.max(100, participantsMaxHeight)}px`;
+            function alignContainerHeights() { 
+              const mainContainer = document.querySelector('main');
+              const chartBox = document.querySelector('.chart-box');
+              const historicalBox = document.querySelector('.historical-box');
+              const participantsBox = document.querySelector('.participants-box');
+              
+              // Essential check that all elements exist
+              if (!mainContainer || !chartBox || !historicalBox || !participantsBox) return;
+
+              // 1. Get reference positions
+              const mainContainerTop = mainContainer.getBoundingClientRect().top;
+
+              // 2. The bottom of the chart is our REFERENCE ALIGNMENT
+              const chartBoxBottom = chartBox.getBoundingClientRect().bottom;
+              const chartBoxBottomRelativeToMain = chartBoxBottom - mainContainerTop;
+
+              // 3. Get the TOP position of the table containers
+              const historicalBoxTopRelativeToMain = historicalBox.getBoundingClientRect().top - mainContainerTop;
+              const participantsBoxTopRelativeToMain = participantsBox.getBoundingClientRect().top - mainContainerTop;
+
+              // 4. Calculate max height: (Chart Bottom) - (Table Top) - (Grid Gap)
+              const historicalMaxHeight = chartBoxBottomRelativeToMain - historicalBoxTopRelativeToMain - 8;
+              const participantsMaxHeight = chartBoxBottomRelativeToMain - participantsBoxTopRelativeToMain - 8;
+
+              // 5. Apply calculated height
+              // This max-height activates the scrollbar (overflow-y: auto)
+              historicalBox.style.maxHeight = `${Math.max(0, historicalMaxHeight)}px`;
+              participantsBox.style.maxHeight = `${Math.max(0, participantsMaxHeight)}px`;
             }
+
             // ===== TICKET PURCHASE FUNCTION =====
 
             /**
@@ -2414,25 +2427,15 @@
                 showWalletPopup();
             });
 
-            // Debounced resize and scroll events
-            let resizeTimeout;
-            window.addEventListener('resize', () => {
-                clearTimeout(resizeTimeout);
-                resizeTimeout = setTimeout(alignContainerHeights, 300);
+            // Ensure the function is called AFTER everything is rendered
+            window.addEventListener('load', () => {
+                // A slight delay is often needed after 'load' for complex elements (like Chart.js)
+                setTimeout(alignContainerHeights, 100); 
             });
-            
-            let scrollTimeout;
-            let lastScrollY = window.scrollY;
-            window.addEventListener('scroll', () => {
-                // Ne recalculer que si le scroll est significatif
-                if (Math.abs(window.scrollY - lastScrollY) > 50) {
-                    clearTimeout(scrollTimeout);
-                    scrollTimeout = setTimeout(() => {
-                        alignContainerHeights();
-                        lastScrollY = window.scrollY;
-                    }, 500);
-                }
-            }, { passive: true });
+
+            // Important: recall the function on resize
+            window.onresize = alignContainerHeights;
+
             // ===== START APPLICATION =====
             initializeData();
             startUpdateIntervals();
@@ -2442,8 +2445,5 @@
 </body>
 
 </html>
-
-
-
 
 

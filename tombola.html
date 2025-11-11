@@ -189,7 +189,7 @@
             grid-template-rows: auto auto auto auto 1fr 1fr;
             gap: 8px;
             padding: 20px;
-            max-width: 2560px;
+            max-width: 1880px;
             margin: 0 auto;
             position: relative;
             z-index: 10;
@@ -627,6 +627,36 @@
         /* Large screens (default) - no changes needed */
         
         /* Medium screens (tablets and smaller desktops) */
+        /* Ajouter après vos media queries existantes */
+        @media (min-width: 2560px) {
+            main {
+                max-width: 2400px;
+                margin: 0 auto;
+            }
+            
+            .info-box {
+                font-size: 18px; /* Agrandir légèrement la police */
+            }
+            
+            .burned-amount, .pool-amount, .countdown-timer {
+                font-size: 20px;
+            }
+        }
+        
+        @media (min-width: 3840px) { /* Pour les écrans 4K */
+            main {
+                max-width: 3200px;
+            }
+            
+            .info-box {
+                font-size: 20px;
+            }
+            
+            h3 {
+                font-size: 22px;
+            }
+        }
+        
         @media (max-width: 1400px) {
             main {
                 max-width: 100%;
@@ -2419,6 +2449,7 @@
 </body>
 
 </html>
+
 
 
 

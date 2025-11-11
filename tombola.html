@@ -1847,9 +1847,25 @@
              * Gets available EVM providers
              */
             function getEVMProviders() {
-                if (!window.ethereum) return [];
-                if (window.ethereum.providers && window.ethereum.providers.length > 0) return window.ethereum.providers;
-                return [window.ethereum];
+                const providers = [];
+
+                // window.ethereum et ses providers
+                if (window.ethereum) {
+                    if (window.ethereum.providers && window.ethereum.providers.length > 0) {
+                        providers.push(...window.ethereum.providers);
+                    } else {
+                        providers.push(window.ethereum);
+                    }
+                }
+
+                // Vérification d'autres wallets connus
+                if (window.rabby) providers.push(window.rabby);
+                if (window.trustwallet) providers.push(window.trustwallet);
+                if (window.brave) providers.push(window.brave);
+                if (window.coinbaseWalletExtension) providers.push(window.coinbaseWalletExtension);
+
+                // Filtre doublons
+                return [...new Set(providers)];
             }
 
             function getWalletName(p) { 
@@ -1966,22 +1982,32 @@
                 popup.innerHTML = '';
                 let providers = getEVMProviders(); 
                 
-                // If no provider is detected
                 if (providers.length === 0) { 
                     showError("No supported wallet detected!"); 
                     return; 
                 }
 
-                // Display all found providers, sorting to put MetaMask first
-                providers.sort((a, b) => a.isMetaMask ? -1 : b.isMetaMask ? 1 : 0);
+                // Tri : MetaMask en premier, les autres ensuite
+                providers.sort((a, b) => {
+                    if (a.isMetaMask) return -1;
+                    if (b.isMetaMask) return 1;
+                    return 0;
+                });
+
+                // Création des boutons
                 providers.forEach((p) => {
                     const walletName = getWalletName(p);
                     const btn = document.createElement('button');
                     btn.textContent = walletName;
-                    // Button calls connectWallet(p)
-                    btn.addEventListener('click', async () => { hideWalletPopup(); await connectWallet(p); });
+
+                    btn.addEventListener('click', async () => {
+                        hideWalletPopup();
+                        await connectWallet(p);
+                    });
+
                     popup.appendChild(btn);
                 });
+
                 overlay.style.display = 'block';
                 popup.style.display = 'block';
             }

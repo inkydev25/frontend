@@ -627,149 +627,6 @@
         /* Large screens (default) - no changes needed */
         
         /* Medium screens (tablets and smaller desktops) */
-        /* Ajouter après vos media queries existantes */
-        /* ===== VERY LARGE SCREENS (TV, 4K) ===== */
-        @media (min-width: 1921px) {
-            body {
-                overflow: auto;
-                min-height: 100vh;
-            }
-            
-            main {
-                max-width: 2400px;
-                margin: 0 auto;
-                grid-template-columns: repeat(12, 1fr);
-                grid-template-rows: auto auto auto auto 1fr 1fr;
-                gap: 12px;
-                padding: 30px;
-            }
-            
-            .info-box {
-                font-size: 16px;
-                padding: 15px;
-            }
-            
-            h3 {
-                font-size: 18px;
-            }
-            
-            .burned-amount, .pool-amount, .countdown-timer {
-                font-size: 20px;
-            }
-            
-            /* Ajuster les hauteurs des boîtes */
-            .last-draw-box {
-                height: 400px;
-            }
-        
-            .participants-box {
-                height: 700px;
-            }
-        
-            .historical-box {
-                height: 800px;
-            }
-        
-            .chart-box {
-                height: 450px;
-            }
-            
-            /* Agrandir les boutons */
-            .button, .total-buy button {
-                padding: 12px 8px;
-                font-size: 16px;
-                width: 220px;
-            }
-            
-            /* Agrandir les inputs */
-            .buy-section input {
-                width: 80px;
-                padding: 8px;
-                font-size: 16px;
-            }
-            
-            /* Agrandir le texte des tableaux */
-            table {
-                font-size: 15px;
-            }
-            
-            table th, table td {
-                padding: 8px 12px;
-            }
-        }
-        
-        @media (min-width: 2560px) {
-            main {
-                max-width: 2800px;
-                padding: 40px;
-            }
-            
-            .info-box {
-                font-size: 18px;
-                padding: 20px;
-            }
-            
-            h3 {
-                font-size: 22px;
-            }
-            
-            .burned-amount, .pool-amount, .countdown-timer {
-                font-size: 24px;
-            }
-            
-            .button, .total-buy button {
-                padding: 14px 10px;
-                font-size: 18px;
-                width: 240px;
-            }
-            
-            .page-title {
-                font-size: 28px;
-            }
-            
-            .page-logo {
-                width: 70px;
-            }
-        }
-        
-        @media (min-width: 3840px) {
-            main {
-                max-width: 3500px;
-                padding: 50px;
-            }
-            
-            .info-box {
-                font-size: 22px;
-                padding: 25px;
-            }
-            
-            h3 {
-                font-size: 26px;
-            }
-            
-            .burned-amount, .pool-amount, .countdown-timer {
-                font-size: 28px;
-            }
-            
-            .button, .total-buy button {
-                padding: 16px 12px;
-                font-size: 20px;
-                width: 260px;
-            }
-            
-            .page-title {
-                font-size: 32px;
-            }
-            
-            .page-logo {
-                width: 80px;
-            }
-            
-            table {
-                font-size: 18px;
-            }
-        }
-        
         @media (max-width: 1400px) {
             main {
                 max-width: 100%;
@@ -1544,59 +1401,6 @@
 
     <!-- Main application script -->
     <script>
-        // === SYSTEME D'ALERTE TV ===
-function showTVAlert(message, isError = true) {
-    const alertDiv = document.createElement('div');
-    alertDiv.style.cssText = `
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: ${isError ? '#ff4444' : '#44ff44'};
-        color: white;
-        padding: 20px;
-        border-radius: 10px;
-        z-index: 99999;
-        font-size: 18px;
-        text-align: center;
-        max-width: 80%;
-    `;
-    alertDiv.innerHTML = `<strong>${isError ? '❌ ERREUR TV' : '✅ SUCCÈS'}</strong><br>${message}`;
-    document.body.appendChild(alertDiv);
-    
-    setTimeout(() => {
-        if (alertDiv.parentNode) alertDiv.parentNode.removeChild(alertDiv);
-    }, 10000);
-}
-
-// Test immédiat des connexions
-async function testTVConnections() {
-    // Test Blockchain
-    try {
-        const provider = new ethers.JsonRpcProvider("https://rpc.testnet.nexera.network");
-        const block = await provider.getBlockNumber();
-        console.log("Blockchain OK:", block);
-    } catch (e) {
-        showTVAlert("BLOCKCHAIN: Connexion impossible - " + e.message);
-        return false;
-    }
-    
-    // Test Backend
-    try {
-        const response = await fetch('https://backend-production-4cb0c.up.railway.app/winners');
-        if (!response.ok) throw new Error('Status: ' + response.status);
-        console.log("Backend OK");
-    } catch (e) {
-        showTVAlert("BACKEND: Données non disponibles - " + e.message);
-        return false;
-    }
-    
-    showTVAlert("Toutes les connexions fonctionnent!", false);
-    return true;
-}
-
-// Lancez le test au chargement
-setTimeout(testTVConnections, 2000);
         // ===== APPLICATION INITIALIZATION =====
         document.addEventListener('DOMContentLoaded', async () => {
             // ===== CONSTANTS AND VARIABLES =====
@@ -1657,18 +1461,14 @@ setTimeout(testTVConnections, 2000);
             /**
              * Safely executes a promise and returns a default value if it fails
              */
-async function safeCall(promise, defaultValue = null) {
-    try { 
-        return await promise; 
-    } catch (e) { 
-        console.error("SafeCall error:", e);
-        // Affiche l'erreur spécifique
-        if (e.message.includes("fetch") || e.message.includes("network")) {
-            showTVAlert("Réseau: Impossible de récupérer les données");
-        }
-        return defaultValue; 
-    }
-}
+            async function safeCall(promise, defaultValue = null) {
+                try { 
+                    return await promise; 
+                } catch (e) { 
+                    console.error("SafeCall error:", e); 
+                    return defaultValue; 
+                }
+            }
 
             /**
              * Shows a loading message
@@ -2619,55 +2419,3 @@ async function safeCall(promise, defaultValue = null) {
 </body>
 
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

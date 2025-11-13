@@ -561,6 +561,24 @@
             color: var(--primary-gold);
         }
 
+        /* ===== ERROR POPUP STYLES ===== */
+        #errorPopup {
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #ff4d4f;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            display: none;
+            font-family: sans-serif;
+            font-size: 14px;
+            text-align: center;
+            position: fixed;
+            z-index: 1000;
+        }
+
         /* ===== RESPONSIVE DESIGN ===== */
         /* Tablet devices (801px to 1000px) */
         @media (max-width: 1000px) {
@@ -1046,6 +1064,9 @@
         </p>
     </section>
 
+    <!-- Popups and overlays -->
+    <div id="errorPopup"></div>
+
     <!-- ===== FOOTER ===== -->
     <footer>
         <h3>Follow us on</h3>
@@ -1057,6 +1078,23 @@
     </footer>
 
     <script>
+       
+        // ==== Shows error message ====
+        function showError(message, duration = 4000) {
+            const popup = document.getElementById("errorPopup");
+            popup.textContent = message;
+            popup.style.display = "block";
+            popup.style.opacity = 1;
+            setTimeout(() => {
+                popup.style.transition = "opacity 0.5s";
+                popup.style.opacity = 0;
+                setTimeout(() => { 
+                    popup.style.display = "none"; 
+                    popup.style.transition = ""; 
+                }, 500);
+            }, duration);
+        }
+
         // ===== HAMBURGER MENU FUNCTIONALITY =====
         const hamburger = document.getElementById('hamburger');
         const navLinks = document.querySelector('.nav-links');
@@ -1179,6 +1217,10 @@
                     }
                 } 
             }
+        });
+      
+        document.querySelector('.buy-button').addEventListener('click', function() {
+            showError('Waiting for Nexera DEX');
         });
     </script>
 </body>

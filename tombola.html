@@ -1844,13 +1844,16 @@
             // ===== WALLET CONNECTION FUNCTIONS =====
 
             let eip6963Providers = [];
-            let currentProvider = null; // IMPORTANT: garder la référence du provider actuel
+            let currentProvider = null;
+            let connectionChecked = false; // Empêcher les reconnexions multiples
+            let isInitializing = false; // NOUVEAU: Éviter la double initialisation
 
             function initEIP6963() {
                 if (typeof window === 'undefined') return;
                 
                 window.addEventListener('eip6963:announceProvider', (event) => {
                     eip6963Providers.push(event.detail);
+                    // Ne pas reconnecter automatiquement quand un nouveau provider arrive
                 });
                 
                 window.dispatchEvent(new Event('eip6963:requestProvider'));
@@ -1860,9 +1863,42 @@
                 initEIP6963();
             }
 
-            /**
-            * Gets available EVM providers
-            */
+            // Vérifier la connexion existante au chargement
+            async function checkExistingConnection() {
+                if (connectionChecked) return; // Éviter les appels multiples
+                connectionChecked = true;
+                
+                try {
+                    const wasConnected = localStorage.getItem("walletConnected") === "true";
+                    const walletType = localStorage.getItem("walletType");
+                    
+                    if (wasConnected && walletType) {
+                        const providers = getEVMProviders();
+                        const savedProvider = providers.find(p => p.name === walletType && p.installed);
+                        
+                        if (savedProvider) {
+                            const accounts = await savedProvider.provider.request({ 
+                                method: 'eth_accounts' 
+                            });
+                            
+                            if (accounts.length > 0) {
+                                isDisconnected = false;
+                                currentProvider = savedProvider;
+                                await updateButton(accounts);
+                                return true;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.log("Aucune connexion existante");
+                }
+                
+                // Si pas de connexion, nettoyer
+                localStorage.removeItem("walletConnected");
+                localStorage.removeItem("walletType");
+                return false;
+            }
+
             function getEVMProviders() {
                 const walletConfigs = [
                     { name: 'MetaMask', rdns: 'io.metamask', traditionalCheck: (ethereum) => ethereum?.isMetaMask && !ethereum?.isRabby && !ethereum?.isTrust },
@@ -1886,9 +1922,6 @@
                 return providers.sort((a, b) => b.installed - a.installed);
             }
 
-            /**
-            * Updates the connect button based on connection status
-            */
             async function updateButton(accounts) {
                 if (isDisconnected) accounts = [];
                 const account = accounts.length > 0 ? accounts[0] : null;
@@ -1905,8 +1938,15 @@
                     await updateBalance(account);
                     balanceInterval = setInterval(() => updateBalance(account), 10000);
                     
-                    // ÉCOUTER LES CHANGEMENTS DE COMPTE - COMME DANS L'ANCIEN CODE
+                    // SAUVEGARDER LA CONNEXION
+                    localStorage.setItem("walletConnected", "true");
+                    if (currentProvider) {
+                        localStorage.setItem("walletType", currentProvider.name);
+                    }
+                    
                     if (currentProvider && currentProvider.provider.on) {
+                        // Supprimer les anciens listeners avant d'en ajouter de nouveaux
+                        currentProvider.provider.removeAllListeners('accountsChanged');
                         currentProvider.provider.on('accountsChanged', (newAccounts) => {
                             updateButton(newAccounts);
                         });
@@ -1924,6 +1964,7 @@
                     button.textContent = 'Connect your wallet';
                     button.classList.remove('connected');
                     await updateBalance(null);
+                    
                     ticketInput.oninput = () => {
                         let val = parseInt(ticketInput.value);
                         if (isNaN(val) || val < 0) val = 0;
@@ -1934,9 +1975,6 @@
                 }
             }
 
-            /**
-            * Connects to a wallet provider
-            */
             async function connectWallet(walletInfo) {
                 let finalError = null;
 
@@ -1946,7 +1984,6 @@
                         isDisconnected = false;
                         localStorage.setItem("walletDisconnected", "false");
                         
-                        // METTRE À JOUR LE PROVIDER COURANT - SOLUTION AU PROBLÈME TRUST WALLET
                         currentProvider = walletInfo;
                         
                         await updateButton(accounts);
@@ -1973,9 +2010,6 @@
                 }
             }
 
-            /**
-            * Shows the wallet selection popup
-            */
             function showWalletPopup() {
                 popup.innerHTML = '';
                 
@@ -2023,18 +2057,24 @@
                 popup.style.display = 'block';
             }
 
-            /**
-            * Hides the wallet popup
-            */
             function hideWalletPopup() { 
                 popup.style.display = 'none'; 
                 overlay.style.display = 'none'; 
             }
 
-            // FONCTION IMPORTANTE: Utiliser pour les transactions
             function getProvider() {
                 return currentProvider ? currentProvider.provider : window.ethereum;
             }
+
+            // CORRECTION: Appeler une seule fois au chargement avec synchronisation
+            setTimeout(() => {
+                checkExistingConnection().then((wasConnected) => {
+                    // Une fois la connexion vérifiée, initialiser les données seulement si pas déjà en cours
+                    if (!isInitializing) {
+                        initializeData();
+                    }
+                });
+            }, 100);
 
             // ===== COUNTDOWN FUNCTION =====
 

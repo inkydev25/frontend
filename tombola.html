@@ -1843,30 +1843,52 @@
 
             // ===== WALLET CONNECTION FUNCTIONS =====
 
+            let eip6963Providers = [];
+            let currentProvider = null; // IMPORTANT: garder la référence du provider actuel
+
+            function initEIP6963() {
+                if (typeof window === 'undefined') return;
+                
+                window.addEventListener('eip6963:announceProvider', (event) => {
+                    eip6963Providers.push(event.detail);
+                });
+                
+                window.dispatchEvent(new Event('eip6963:requestProvider'));
+            }
+
+            if (typeof window !== 'undefined') {
+                initEIP6963();
+            }
+
             /**
-             * Gets available EVM providers
-             */
+            * Gets available EVM providers
+            */
             function getEVMProviders() {
-                if (!window.ethereum) return [];
-                if (window.ethereum.providers && window.ethereum.providers.length > 0) return window.ethereum.providers;
-                return [window.ethereum];
-            }
+                const walletConfigs = [
+                    { name: 'MetaMask', rdns: 'io.metamask', traditionalCheck: (ethereum) => ethereum?.isMetaMask && !ethereum?.isRabby && !ethereum?.isTrust },
+                    { name: 'Trust Wallet', rdns: 'com.trustwallet.app', traditionalCheck: (ethereum) => ethereum?.isTrust },
+                    { name: 'Rabby Wallet', rdns: 'io.rabby', traditionalCheck: (ethereum) => ethereum?.isRabby },
+                    { name: 'Coinbase Wallet', rdns: 'com.coinbase.wallet', traditionalCheck: (ethereum) => ethereum?.isCoinbaseWallet || typeof window.coinbaseWalletExtension !== 'undefined' },
+                    { name: 'Phantom', rdns: 'app.phantom', traditionalCheck: (ethereum) => ethereum?.isPhantom || typeof window.phantom?.ethereum !== 'undefined' }
+                ];
 
-            function getWalletName(p) { 
-                if (p.isRabby) return "Rabby Wallet";
-                if (p.isTrust) return "Trust Wallet"; 
-                if (p.isKeplr) return "Keplr Wallet";
-                if (p.isCoinbaseWallet) return "Coinbase Wallet";
-                if (p.isBraveWallet) return "Brave Wallet";
-                if (p.isPhantom) return "Phantom";
-                if (p.isMetaMask) return "MetaMask"; 
-                if (p.name) return p.name;
-                return "EVM Wallet";
+                const providers = walletConfigs.map(wallet => {
+                    const eipProvider = eip6963Providers.find(p => p.info.rdns === wallet.rdns);
+                    
+                    if (eipProvider) {
+                        return { name: wallet.name, provider: eipProvider.provider, installed: true };
+                    }
+                    
+                    const traditionalProvider = wallet.traditionalCheck(window.ethereum) ? window.ethereum : null;
+                    return { name: wallet.name, provider: traditionalProvider, installed: !!traditionalProvider };
+                });
+
+                return providers.sort((a, b) => b.installed - a.installed);
             }
 
             /**
-             * Updates the connect button based on connection status
-             */
+            * Updates the connect button based on connection status
+            */
             async function updateButton(accounts) {
                 if (isDisconnected) accounts = [];
                 const account = accounts.length > 0 ? accounts[0] : null;
@@ -1882,6 +1904,14 @@
                     button.classList.add('connected');
                     await updateBalance(account);
                     balanceInterval = setInterval(() => updateBalance(account), 10000);
+                    
+                    // ÉCOUTER LES CHANGEMENTS DE COMPTE - COMME DANS L'ANCIEN CODE
+                    if (currentProvider && currentProvider.provider.on) {
+                        currentProvider.provider.on('accountsChanged', (newAccounts) => {
+                            updateButton(newAccounts);
+                        });
+                    }
+                    
                     ticketInput.oninput = () => {
                         let maxTicketsAllowed = parseInt(maxTicketsEl.textContent.toString());
                         let currentValue = parseInt(ticketInput.value);
@@ -1905,93 +1935,105 @@
             }
 
             /**
-             * Connects to a wallet provider
-             */
-            async function connectWallet(provider) {
+            * Connects to a wallet provider
+            */
+            async function connectWallet(walletInfo) {
                 let finalError = null;
 
-                // Function to attempt connection
-                const attemptConnection = async (p) => {
+                const attemptConnection = async () => {
                     try {
-                        const accounts = await p.request({ method: 'eth_requestAccounts' });
+                        const accounts = await walletInfo.provider.request({ method: 'eth_requestAccounts' });
                         isDisconnected = false;
                         localStorage.setItem("walletDisconnected", "false");
+                        
+                        // METTRE À JOUR LE PROVIDER COURANT - SOLUTION AU PROBLÈME TRUST WALLET
+                        currentProvider = walletInfo;
+                        
                         await updateButton(accounts);
-                        return true; // Connection successful
+                        return true;
                     } catch (err) {
                         finalError = err;
-                        return false; // Connection failed
+                        return false;
                     }
                 };
 
-                // 1. First attempt
-                if (await attemptConnection(provider)) {
-                    return;
-                }
+                if (await attemptConnection()) return;
 
-                // 2. If first attempt failed with instability error (-32603), retry once after a short delay
                 if (finalError && finalError.code === -32603) {
-                    console.warn("Wallet instability detected. Retrying once after 100ms...");
                     await new Promise(resolve => setTimeout(resolve, 100));
-                    
-                    if (await attemptConnection(provider)) {
-                        return;
-                    }
+                    if (await attemptConnection()) return;
                 }
                 
-                // 3. Display final error after all attempts failed
                 if (finalError) {
-                    console.error("Wallet connection failed details:", finalError);
                     let errorMessage = "Wallet connection failed";
-
-                    if (finalError.code === 4001) {
-                        errorMessage = "Connection rejected by user.";
-                    } else if (finalError.code === -32002) {
-                        errorMessage = "Pending request. Please check your wallet's extension/pop-up.";
-                    } else if (finalError.code === -32603) {
-                        // After retry failure
-                        errorMessage = "Wallet not ready. Please unlock your extension and try again.";
-                    } else if (finalError.message) {
-                        errorMessage = finalError.message.substring(0, 100);
-                    }
-
+                    if (finalError.code === 4001) errorMessage = "Connection rejected by user.";
+                    else if (finalError.code === -32002) errorMessage = "Pending request. Please check your wallet.";
+                    else if (finalError.code === -32603) errorMessage = "Wallet not ready. Please unlock your extension.";
                     showError(errorMessage);
                 }
             }
 
             /**
-             * Shows the wallet selection popup
-             */
+            * Shows the wallet selection popup
+            */
             function showWalletPopup() {
                 popup.innerHTML = '';
+                
+                const title = document.createElement('h3');
+                title.textContent = 'Supported Wallets';
+                title.style.textAlign = 'center';
+                title.style.margin = '0';
+                title.style.marginBottom = '20px';
+                title.style.color = '#E5C07B';
+                title.style.display = 'block';
+                title.style.width = '100%';
+                popup.appendChild(title);
+
                 let providers = getEVMProviders(); 
                 
-                // If no provider is detected
-                if (providers.length === 0) { 
+                if (providers.filter(p => p.installed).length === 0) { 
                     showError("No supported wallet detected!"); 
                     return; 
                 }
 
-                // Display all found providers, sorting to put MetaMask first
-                providers.sort((a, b) => a.isMetaMask ? -1 : b.isMetaMask ? 1 : 0);
                 providers.forEach((p) => {
-                    const walletName = getWalletName(p);
                     const btn = document.createElement('button');
-                    btn.textContent = walletName;
-                    // Button calls connectWallet(p)
-                    btn.addEventListener('click', async () => { hideWalletPopup(); await connectWallet(p); });
+                    btn.textContent = p.name;
+                    
+                    if (p.installed) {
+                        btn.addEventListener('click', async () => { 
+                            hideWalletPopup(); 
+                            await connectWallet(p); 
+                        });
+                    } else {
+                        btn.disabled = true;
+                        btn.style.opacity = '0.6';
+                        btn.style.cursor = 'not-allowed';
+                        const status = document.createElement('span');
+                        status.textContent = ' (Not Installed)';
+                        status.style.fontSize = '0.8em';
+                        status.style.color = '#999';
+                        btn.appendChild(status);
+                    }
+                    
                     popup.appendChild(btn);
                 });
+                
                 overlay.style.display = 'block';
                 popup.style.display = 'block';
             }
 
             /**
-             * Hides the wallet popup
-             */
+            * Hides the wallet popup
+            */
             function hideWalletPopup() { 
                 popup.style.display = 'none'; 
                 overlay.style.display = 'none'; 
+            }
+
+            // FONCTION IMPORTANTE: Utiliser pour les transactions
+            function getProvider() {
+                return currentProvider ? currentProvider.provider : window.ethereum;
             }
 
             // ===== COUNTDOWN FUNCTION =====
@@ -2271,7 +2313,7 @@
 
                 buyButton.disabled = true;
                 try {
-                    const provider = new ethers.BrowserProvider(window.ethereum);
+                    const provider = new ethers.BrowserProvider(getProvider());
                     const signer = await provider.getSigner();
                     const ticketSaleContract = new ethers.Contract(TICKET_SALE_ADDRESS, TICKET_SALE_ABI, signer);
                     const inkyContractWithSigner = new ethers.Contract(INKY_ADDRESS, INKY_ABI, signer);
@@ -2352,13 +2394,18 @@
                 ]);
                 
                 const providers = getEVMProviders();
-                providers.forEach(p => { if (p && p.on) p.on('accountsChanged', updateButton); });
+                providers.forEach(p => { 
+                    if (p.installed && p.provider && p.provider.on) {
+                        p.provider.on('accountsChanged', updateButton); 
+                    }
+                });
 
                 if (!isDisconnected) {
                     for (const p of providers) {
-                        if (p) {
-                            const accounts = await safeCall(p.request({ method: 'eth_accounts' }), []);
+                        if (p.installed && p.provider) {
+                            const accounts = await safeCall(p.provider.request({ method: 'eth_accounts' }), []);
                             if (accounts.length > 0) {
+                                currentProvider = p;
                                 await updateButton(accounts);
                                 break;
                             }

@@ -2434,26 +2434,13 @@
                 ]);
                 
                 const providers = getEVMProviders();
+                // Écouter les changements sur tous les providers installés
                 providers.forEach(p => { 
                     if (p.installed && p.provider && p.provider.on) {
                         p.provider.on('accountsChanged', updateButton); 
                     }
                 });
 
-                if (!isDisconnected) {
-                    for (const p of providers) {
-                        if (p.installed && p.provider) {
-                            const accounts = await safeCall(p.provider.request({ method: 'eth_accounts' }), []);
-                            if (accounts.length > 0) {
-                                currentProvider = p;
-                                await updateButton(accounts);
-                                break;
-                            }
-                        }
-                    }
-                } else {
-                    await updateButton([]);
-                }
             }
 
             /**

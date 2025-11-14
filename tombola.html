@@ -1845,15 +1845,13 @@
 
             let eip6963Providers = [];
             let currentProvider = null;
-            let connectionChecked = false; // Empêcher les reconnexions multiples
-            let isInitializing = false; // NOUVEAU: Éviter la double initialisation
+            let connectionChecked = false;
 
             function initEIP6963() {
                 if (typeof window === 'undefined') return;
                 
                 window.addEventListener('eip6963:announceProvider', (event) => {
                     eip6963Providers.push(event.detail);
-                    // Ne pas reconnecter automatiquement quand un nouveau provider arrive
                 });
                 
                 window.dispatchEvent(new Event('eip6963:requestProvider'));
@@ -1863,9 +1861,8 @@
                 initEIP6963();
             }
 
-            // Vérifier la connexion existante au chargement
             async function checkExistingConnection() {
-                if (connectionChecked) return; // Éviter les appels multiples
+                if (connectionChecked) return false;
                 connectionChecked = true;
                 
                 try {
@@ -1877,12 +1874,8 @@
                         const savedProvider = providers.find(p => p.name === walletType && p.installed);
                         
                         if (savedProvider) {
-                            const accounts = await savedProvider.provider.request({ 
-                                method: 'eth_accounts' 
-                            });
-                            
+                            const accounts = await savedProvider.provider.request({ method: 'eth_accounts' });
                             if (accounts.length > 0) {
-                                isDisconnected = false;
                                 currentProvider = savedProvider;
                                 await updateButton(accounts);
                                 return true;
@@ -1890,10 +1883,9 @@
                         }
                     }
                 } catch (error) {
-                    console.log("Aucune connexion existante");
+                    console.log("No existing connection");
                 }
                 
-                // Si pas de connexion, nettoyer
                 localStorage.removeItem("walletConnected");
                 localStorage.removeItem("walletType");
                 return false;
@@ -1902,28 +1894,45 @@
             function getEVMProviders() {
                 const walletConfigs = [
                     { name: 'MetaMask', rdns: 'io.metamask', traditionalCheck: (ethereum) => ethereum?.isMetaMask && !ethereum?.isRabby && !ethereum?.isTrust },
-                    { name: 'Trust Wallet', rdns: 'com.trustwallet.app', traditionalCheck: (ethereum) => ethereum?.isTrust },
                     { name: 'Rabby Wallet', rdns: 'io.rabby', traditionalCheck: (ethereum) => ethereum?.isRabby },
                     { name: 'Coinbase Wallet', rdns: 'com.coinbase.wallet', traditionalCheck: (ethereum) => ethereum?.isCoinbaseWallet || typeof window.coinbaseWalletExtension !== 'undefined' },
                     { name: 'Phantom', rdns: 'app.phantom', traditionalCheck: (ethereum) => ethereum?.isPhantom || typeof window.phantom?.ethereum !== 'undefined' }
                 ];
 
-                const providers = walletConfigs.map(wallet => {
+                const eip6963ProvidersList = [];
+                walletConfigs.forEach(wallet => {
                     const eipProvider = eip6963Providers.find(p => p.info.rdns === wallet.rdns);
-                    
                     if (eipProvider) {
-                        return { name: wallet.name, provider: eipProvider.provider, installed: true };
+                        eip6963ProvidersList.push({ 
+                            name: wallet.name, 
+                            provider: eipProvider.provider, 
+                            installed: true,
+                            isEIP6963: true 
+                        });
                     }
-                    
-                    const traditionalProvider = wallet.traditionalCheck(window.ethereum) ? window.ethereum : null;
-                    return { name: wallet.name, provider: traditionalProvider, installed: !!traditionalProvider };
                 });
 
-                return providers.sort((a, b) => b.installed - a.installed);
+                const traditionalProviders = walletConfigs
+                    .filter(wallet => !eip6963ProvidersList.some(p => p.name === wallet.name))
+                    .map(wallet => {
+                        const traditionalProvider = wallet.traditionalCheck(window.ethereum) ? window.ethereum : null;
+                        return { 
+                            name: wallet.name, 
+                            provider: traditionalProvider, 
+                            installed: !!traditionalProvider,
+                            isEIP6963: false 
+                        };
+                    });
+
+                return [...eip6963ProvidersList, ...traditionalProviders]
+                    .sort((a, b) => {
+                        if (a.isEIP6963 && !b.isEIP6963) return -1;
+                        if (!a.isEIP6963 && b.isEIP6963) return 1;
+                        return b.installed - a.installed;
+                    });
             }
 
             async function updateButton(accounts) {
-                if (isDisconnected) accounts = [];
                 const account = accounts.length > 0 ? accounts[0] : null;
 
                 lastAccount = account;
@@ -1938,14 +1947,12 @@
                     await updateBalance(account);
                     balanceInterval = setInterval(() => updateBalance(account), 10000);
                     
-                    // SAUVEGARDER LA CONNEXION
                     localStorage.setItem("walletConnected", "true");
                     if (currentProvider) {
                         localStorage.setItem("walletType", currentProvider.name);
                     }
                     
                     if (currentProvider && currentProvider.provider.on) {
-                        // Supprimer les anciens listeners avant d'en ajouter de nouveaux
                         currentProvider.provider.removeAllListeners('accountsChanged');
                         currentProvider.provider.on('accountsChanged', (newAccounts) => {
                             updateButton(newAccounts);
@@ -1965,6 +1972,9 @@
                     button.classList.remove('connected');
                     await updateBalance(null);
                     
+                    localStorage.removeItem("walletConnected");
+                    localStorage.removeItem("walletType");
+                    
                     ticketInput.oninput = () => {
                         let val = parseInt(ticketInput.value);
                         if (isNaN(val) || val < 0) val = 0;
@@ -1976,36 +1986,15 @@
             }
 
             async function connectWallet(walletInfo) {
-                let finalError = null;
-
-                const attemptConnection = async () => {
-                    try {
-                        const accounts = await walletInfo.provider.request({ method: 'eth_requestAccounts' });
-                        isDisconnected = false;
-                        localStorage.setItem("walletDisconnected", "false");
-                        
-                        currentProvider = walletInfo;
-                        
-                        await updateButton(accounts);
-                        return true;
-                    } catch (err) {
-                        finalError = err;
-                        return false;
-                    }
-                };
-
-                if (await attemptConnection()) return;
-
-                if (finalError && finalError.code === -32603) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    if (await attemptConnection()) return;
-                }
-                
-                if (finalError) {
+                try {
+                    const accounts = await walletInfo.provider.request({ method: 'eth_requestAccounts' });
+                    currentProvider = walletInfo;
+                    await updateButton(accounts);
+                } catch (error) {
                     let errorMessage = "Wallet connection failed";
-                    if (finalError.code === 4001) errorMessage = "Connection rejected by user.";
-                    else if (finalError.code === -32002) errorMessage = "Pending request. Please check your wallet.";
-                    else if (finalError.code === -32603) errorMessage = "Wallet not ready. Please unlock your extension.";
+                    if (error.code === 4001) errorMessage = "Connection rejected by user.";
+                    else if (error.code === -32002) errorMessage = "Pending request. Please check your wallet.";
+                    else if (error.code === -32603) errorMessage = "Wallet not ready. Please unlock your extension.";
                     showError(errorMessage);
                 }
             }
@@ -2066,11 +2055,9 @@
                 return currentProvider ? currentProvider.provider : window.ethereum;
             }
 
-            // CORRECTION: Appeler une seule fois au chargement avec synchronisation
             setTimeout(() => {
                 checkExistingConnection().then((wasConnected) => {
-                    // Une fois la connexion vérifiée, initialiser les données seulement si pas déjà en cours
-                    if (!isInitializing) {
+                    if (!wasConnected) {
                         initializeData();
                     }
                 });

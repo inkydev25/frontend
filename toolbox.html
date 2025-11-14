@@ -2087,6 +2087,9 @@ class RiskAnalyzer {
             return;
         }
 
+        showLoader("🔍 Analysis in progress...");
+        this.resetRiskResults();
+
         try {
             const code = await walletManager.getProvider().getCode(tokenAddress);
             if (!code || code === "0x") {
@@ -2098,9 +2101,6 @@ class RiskAnalyzer {
             showError("Unable to verify if the address is a smart contract. Check console for details.");
             return;
         }
-
-        showLoader("🔍 Analysis in progress...");
-        this.resetRiskResults();
 
         try {
             const [centralisedResult, mintableResult, honeypotResult] = await Promise.all([

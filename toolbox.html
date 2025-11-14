@@ -1231,12 +1231,21 @@ class WalletManager {
         this.provider = null;
         this.readProvider = null;
         this.isWalletConnected = false;
-        this.currentChainIdDisplay = "Not Connected";
+        this.currentProvider = null;
+        this.eip6963Providers = [];
         this.walletName = null;
         
         this.domElements = {};
         this.cacheDOMElements();
         this.setupEventListeners();
+        this.initEIP6963();
+    }
+
+    initEIP6963() {
+        window.addEventListener('eip6963:announceProvider', (event) => {
+            this.eip6963Providers.push(event.detail);
+        });
+        window.dispatchEvent(new Event('eip6963:requestProvider'));
     }
 
     cacheDOMElements() {
@@ -1252,57 +1261,64 @@ class WalletManager {
         if (this.domElements.popupOverlay) {
             this.domElements.popupOverlay.addEventListener('click', () => this.closeWalletPopup());
         }
-        this.attachProviderListeners();
-    }
-
-    getWalletName(p) {
-        if (p.isRabby) return "Rabby Wallet";
-        if (p.isTrust) return "Trust Wallet"; 
-        if (p.isCoinbaseWallet) return "Coinbase Wallet";
-        if (p.isKeplr) return "Keplr Wallet";
-        if (p.isBraveWallet) return "Brave Wallet";
-        if (p.isPhantom) return "Phantom";
-        if (p.isMetaMask) return "MetaMask"; 
-        if (p.name) return p.name;
-        return "EVM Wallet";
+        
+        setTimeout(() => this.checkExistingConnection(), 100);
     }
 
     getEVMProviders() {
-        if (window.ethereum?.providers && Array.isArray(window.ethereum.providers)) {
-            return window.ethereum.providers;
-        }
-        if (window.ethereum) {
-            return [window.ethereum];
-        }
-        return [];
+        const walletConfigs = [
+            { name: 'MetaMask', rdns: 'io.metamask', check: (e) => e?.isMetaMask && !e?.isRabby },
+            { name: 'Rabby Wallet', rdns: 'io.rabby', check: (e) => e?.isRabby },
+            { name: 'Coinbase Wallet', rdns: 'com.coinbase.wallet', check: (e) => e?.isCoinbaseWallet },
+            { name: 'Phantom', rdns: 'app.phantom', check: (e) => e?.isPhantom },
+            { name: 'Trust Wallet', rdns: 'com.trustwallet.app', check: (e) => e?.isTrust }
+        ];
+
+        const eip6963List = walletConfigs
+            .map(wallet => this.eip6963Providers.find(p => p.info.rdns === wallet.rdns))
+            .filter(Boolean)
+            .map(p => ({ 
+                name: p.info.name, 
+                provider: p.provider, 
+                installed: true,
+                isEIP6963: true 
+            }));
+
+        const traditionalList = walletConfigs
+            .filter(wallet => !eip6963List.some(p => p.name === wallet.name))
+            .map(wallet => ({ 
+                name: wallet.name, 
+                provider: wallet.check(window.ethereum) ? window.ethereum : null, 
+                installed: !!window.ethereum && wallet.check(window.ethereum),
+                isEIP6963: false 
+            }));
+
+        return [...eip6963List, ...traditionalList];
     }
 
-    async attachProviderListeners(timeoutMs = 3000) {
-        if (!window.ethereum) {
-            const start = Date.now();
-            while (!window.ethereum && (Date.now() - start) < timeoutMs) {
-                await new Promise(r => setTimeout(r, 100));
-            }
-            if (!window.ethereum) return;
-        }
+    async checkExistingConnection() {
+        const savedWalletName = localStorage.getItem('connectedWalletName');
+        const savedAddress = localStorage.getItem('userAddress');
+        
+        if (!savedWalletName || !savedAddress) return;
 
-        const providers = this.getEVMProviders();
-        providers.forEach(p => {
-            if (p && p.on) {
-                p.on('accountsChanged', (accounts) => this.handleAccountsChanged(accounts));
-                p.on('chainChanged', (chainId) => {
-                    window.location.reload();
-                });
+        const providers = this.getEVMProviders().filter(p => p.installed);
+        const savedProvider = providers.find(p => p.name === savedWalletName);
+        
+        if (savedProvider) {
+            try {
+                const accounts = await savedProvider.provider.request({ method: 'eth_accounts' });
+                if (accounts.length > 0 && accounts[0].toLowerCase() === savedAddress) {
+                    await this.connectWalletFromProvider(savedProvider);
+                }
+            } catch (error) {
+                this.clearStorage();
             }
-        });
+        }
     }
 
     handleConnectButtonClick() {
-        if (this.userAddress) {
-            this.disconnectWallet();
-        } else {
-            this.showWalletPopup();
-        }
+        this.userAddress ? this.disconnectWallet() : this.showWalletPopup();
     }
 
     showWalletPopup() {
@@ -1310,25 +1326,41 @@ class WalletManager {
         const overlay = this.domElements.popupOverlay;
         popup.innerHTML = '';
         
-        let providers = this.getEVMProviders();
-        if (providers.length === 0) {
+        const title = document.createElement('h3');
+        title.textContent = 'Supported Wallets';
+        title.style.textAlign = 'center';
+        title.style.margin = '0';
+        title.style.marginBottom = '20px';
+        title.style.color = '#E5C07B';
+        title.style.display = 'block';
+        title.style.width = '100%';
+        popup.appendChild(title);
+
+        const providers = this.getEVMProviders();
+        
+        if (providers.filter(p => p.installed).length === 0) {
             showError("No supported wallet detected!");
             return;
         }
 
-        providers.sort((a, b) => a.isMetaMask ? -1 : b.isMetaMask ? 1 : 0);
-        
         providers.forEach((p) => {
-            const walletName = this.getWalletName(p);
             const btn = document.createElement('button');
-            btn.textContent = `${walletName}`;
             btn.className = 'wallet-connect-btn';
-
-            btn.addEventListener('click', async () => {
-                const ethersProvider = new ethers.BrowserProvider(p);
-                this.closeWalletPopup();
-                await this.connectWallet(ethersProvider, p, walletName);
-            });
+            btn.textContent = p.name;
+            
+            if (p.installed) {
+                btn.addEventListener('click', () => this.connectWalletFromProvider(p));
+            } else {
+                btn.disabled = true;
+                btn.style.opacity = '0.6';
+                btn.style.cursor = 'not-allowed';
+                const status = document.createElement('span');
+                status.textContent = ' (Not Installed)';
+                status.style.fontSize = '0.8em';
+                status.style.color = '#999';
+                btn.appendChild(status);
+            }
+            
             popup.appendChild(btn);
         });
         
@@ -1337,173 +1369,122 @@ class WalletManager {
     }
 
     closeWalletPopup() {
-        if (this.domElements.popupOverlay && this.domElements.walletPopup) {
-            this.domElements.popupOverlay.style.display = 'none';
-            this.domElements.walletPopup.style.display = 'none';
-        }
+        this.domElements.popupOverlay.style.display = 'none';
+        this.domElements.walletPopup.style.display = 'none';
     }
 
-    async connectWallet(ethersProvider, rawProvider = null, walletName = null) {
-        this.closeWalletPopup();
-        this.domElements.connectButton.textContent = 'Connect Wallet';
-        let finalError = null;
-
-        const attemptConnection = async () => {
-            try {
-                const accounts = rawProvider && rawProvider.request
-                    ? await rawProvider.request({ method: 'eth_requestAccounts', params: [] })
-                    : await ethersProvider.send("eth_requestAccounts", []);
-                
-                const tempUserAddress = accounts && accounts[0] ? accounts[0].toLowerCase() : null;
-
-                if (tempUserAddress) {
-                    this.provider = ethersProvider;
-                    this.userAddress = tempUserAddress;
-                    this.isWalletConnected = true;
-                    this.walletName = walletName;
-
-                    localStorage.setItem('userAddress', this.userAddress);
-                    if (walletName) localStorage.setItem('connectedWalletName', walletName);
-
-                    this.domElements.connectButton.textContent = `Connected: ${truncateAddress(this.userAddress)}`;
-
-                    showLoader("🔄 Fetching data...");
-
-                    this.readProvider = new ethers.JsonRpcProvider(NXRA_CHAIN.RPC_URL);
-
-                    this.onWalletConnected();
-                    
-                    return true;
-                }
-                return false;
-            } catch (error) {
-                finalError = error;
-                return false;
-            }
-        };
-
-        if (await attemptConnection()) return;
-
-        if (finalError && finalError.code === -32603) {
-            console.warn("Wallet instability detected. Retrying once after 100ms...");
-            await new Promise(resolve => setTimeout(resolve, 100));
-            if (await attemptConnection()) return;
-        }
-
-        if (finalError) {
-            console.error("Connection error (Final):", finalError);
-            this.userAddress = null;
-            this.domElements.connectButton.textContent = 'Connect Wallet';
-
-            let errorMessage = "Failed to connect wallet: " + finalError.message;
-            if (finalError.code === 4001) errorMessage = "Connection rejected by user.";
-            else if (finalError.code === -32002) errorMessage = "Pending request. Please check your wallet's extension/pop-up.";
-            else if (finalError.code === -32603) errorMessage = "Wallet not ready. Please unlock your extension and try again.";
-
-            showError(errorMessage);
-        }
-    }
-
-    async autoReconnectWallet() {
-        const savedWalletName = localStorage.getItem('connectedWalletName');
-        const savedAddress = localStorage.getItem('userAddress');
-        if (!savedWalletName || !window.ethereum) return;
-
-        const providers = this.getEVMProviders();
-        let chosen = providers.find(pr => this.getWalletName(pr) === savedWalletName) || providers[0];
-        if (!chosen) return;
-
+    async connectWalletFromProvider(walletInfo) {
         try {
-            const accounts = chosen.request
-                ? await chosen.request({ method: 'eth_accounts' })
-                : (await new ethers.BrowserProvider(chosen).send('eth_accounts', []));
-            
-            if (!accounts || accounts.length === 0) {
-                localStorage.removeItem('userAddress');
-                localStorage.removeItem('connectedWalletName');
-                return;
+            const accounts = await walletInfo.provider.request({ method: 'eth_requestAccounts' });
+            if (accounts.length > 0) {
+                const ethersProvider = new ethers.BrowserProvider(walletInfo.provider);
+                await this.finalizeConnection(ethersProvider, walletInfo.provider, walletInfo.name, accounts[0]);
+                this.closeWalletPopup();
             }
-
-            this.userAddress = accounts[0].toLowerCase();
-            this.provider = new ethers.BrowserProvider(chosen);
-            this.isWalletConnected = true;
-            this.walletName = savedWalletName;
-            this.readProvider = new ethers.JsonRpcProvider(NXRA_CHAIN.RPC_URL);
-
-            if (this.domElements.connectButton) {
-                this.domElements.connectButton.textContent = `Connected: ${truncateAddress(this.userAddress)}`;
-            }
-
-            this.onWalletConnected();
-            console.log("Wallet auto-reconnected:", this.userAddress);
-        } catch (err) {
-            console.error("Auto reconnect failed:", err);
-            localStorage.removeItem('userAddress');
-            localStorage.removeItem('connectedWalletName');
+        } catch (error) {
+            this.handleConnectionError(error);
         }
     }
 
-    async handleAccountsChanged(accounts) {
-        console.log("ACCOUNTS CHANGED EVENT FIRED. New accounts:", accounts);
+    async finalizeConnection(ethersProvider, rawProvider, walletName, account) {
+        this.userAddress = account.toLowerCase();
+        this.provider = ethersProvider;
+        this.isWalletConnected = true;
+        this.walletName = walletName;
+        this.currentProvider = rawProvider;
 
-        if (accounts.length === 0) {
-            this.disconnectWallet();
-        } else {
-            const newAddress = accounts[0].toLowerCase();
-            this.userAddress = newAddress;
-            localStorage.setItem('userAddress', this.userAddress);
+        localStorage.setItem('userAddress', this.userAddress);
+        localStorage.setItem('connectedWalletName', walletName);
 
-            if (window.ethereum) this.provider = new ethers.BrowserProvider(window.ethereum);
+        this.setupProviderEventListeners(rawProvider);
+        this.updateUI();
+        this.onWalletConnected();
+    }
 
-            this.onWalletConnected();
+    setupProviderEventListeners(provider) {
+        if (provider && provider.on) {
+            provider.on('accountsChanged', (accounts) => {
+                if (accounts.length === 0) {
+                    this.disconnectWallet();
+                } else {
+                    const newAddress = accounts[0].toLowerCase();
+                    if (newAddress !== this.userAddress) {
+                        this.userAddress = newAddress;
+                        localStorage.setItem('userAddress', this.userAddress);
+                        this.updateUI();
+                        this.onAccountChanged(newAddress);
+                    }
+                }
+            });
+
+            provider.on('chainChanged', (chainId) => {
+                console.log("Chain changed:", chainId);
+                window.location.reload();
+            });
+
+            provider.on('disconnect', (error) => {
+                console.log("Wallet disconnected:", error);
+                this.disconnectWallet();
+            });
         }
+    }
+
+    removeProviderEventListeners(provider) {
+        if (provider && provider.removeAllListeners) {
+            provider.removeAllListeners('accountsChanged');
+            provider.removeAllListeners('chainChanged');
+            provider.removeAllListeners('disconnect');
+        }
+    }
+
+    handleConnectionError(error) {
+        let errorMessage = "Failed to connect wallet";
+        if (error.code === 4001) errorMessage = "Connection rejected by user.";
+        else if (error.code === -32002) errorMessage = "Pending request. Please check your wallet.";
+        showError(errorMessage);
     }
 
     disconnectWallet() {
-        this.isWalletConnected = false;
+        if (this.currentProvider) {
+            this.removeProviderEventListeners(this.currentProvider);
+        }
+
         this.userAddress = null;
         this.provider = null;
-        this.currentChainIdDisplay = "Not Connected";
+        this.isWalletConnected = false;
         this.walletName = null;
+        this.currentProvider = null;
 
-        const totalRecipientsEl = document.getElementById('totalRecipients');
-        const totalAmountEl = document.getElementById('totalAmount');
-        const summarySymbolEl = document.getElementById('summaryTokenSymbol');
+        this.clearStorage();
+        this.updateUI();
+        this.onWalletDisconnected();
+    }
 
-        if (totalRecipientsEl) totalRecipientsEl.textContent = '-';
-        if (totalAmountEl) {
-            totalAmountEl.textContent = '-';
-            totalAmountEl.classList.remove('total-over');
-        }
-        if (summarySymbolEl) {
-            summarySymbolEl.classList.remove('total-over');
-        }
-
+    clearStorage() {
         localStorage.removeItem('userAddress');
         localStorage.removeItem('connectedWalletName');
-
-        if (typeof multisender !== 'undefined') {
-            multisender.updateMultiSenderUI(null);
-        }
-
-        this.onWalletDisconnected();
     }
 
     onWalletConnected() {
         console.log("Wallet connected:", this.userAddress);
-        
-        this.updateUI();
-        
         if (typeof multisender !== 'undefined') {
             multisender.updateMultiSenderUI(this.userAddress);
         }
-
         hideLoader();
     }
 
     onWalletDisconnected() {
         console.log("Wallet disconnected");
-        this.updateUI();
+        if (typeof multisender !== 'undefined') {
+            multisender.updateMultiSenderUI(null);
+        }
+    }
+
+    onAccountChanged(newAddress) {
+        console.log("Account changed to:", newAddress);
+        if (typeof multisender !== 'undefined') {
+            multisender.updateMultiSenderUI(newAddress);
+        }
     }
 
     updateUI() {
@@ -1511,34 +1492,17 @@ class WalletManager {
             if (this.userAddress) {
                 this.domElements.connectButton.textContent = 'Connected: ' + truncateAddress(this.userAddress);
                 this.domElements.connectButton.classList.add('connected');
-                this.domElements.connectButton.title = this.userAddress;
             } else {
                 this.domElements.connectButton.textContent = 'Connect Wallet';
                 this.domElements.connectButton.classList.remove('connected');
-                this.domElements.connectButton.title = '';
             }
         }
     }
 
-    getUserAddress() {
-        return this.userAddress;
-    }
-
-    getProvider() {
-        return this.provider;
-    }
-
-    getReadProvider() {
-        return this.readProvider;
-    }
-
-    isConnected() {
-        return this.isWalletConnected;
-    }
-
-    getChainId() {
-        return this.currentChainIdDisplay;
-    }
+    getUserAddress() { return this.userAddress; }
+    getProvider() { return this.provider; }
+    getReadProvider() { return this.readProvider || (this.readProvider = new ethers.JsonRpcProvider(NXRA_CHAIN.RPC_URL)); }
+    isConnected() { return this.isWalletConnected; }
 }
 
 // ===== MULTISENDER CLASS =====

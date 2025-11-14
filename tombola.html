@@ -1896,7 +1896,8 @@
                     { name: 'MetaMask', rdns: 'io.metamask', traditionalCheck: (ethereum) => ethereum?.isMetaMask && !ethereum?.isRabby && !ethereum?.isTrust },
                     { name: 'Rabby Wallet', rdns: 'io.rabby', traditionalCheck: (ethereum) => ethereum?.isRabby },
                     { name: 'Coinbase Wallet', rdns: 'com.coinbase.wallet', traditionalCheck: (ethereum) => ethereum?.isCoinbaseWallet || typeof window.coinbaseWalletExtension !== 'undefined' },
-                    { name: 'Phantom', rdns: 'app.phantom', traditionalCheck: (ethereum) => ethereum?.isPhantom || typeof window.phantom?.ethereum !== 'undefined' }
+                    { name: 'Phantom', rdns: 'app.phantom', traditionalCheck: (ethereum) => ethereum?.isPhantom || typeof window.phantom?.ethereum !== 'undefined' },
+                    { name: 'Trust Wallet', rdns: 'com.trustwallet.app', traditionalCheck: (ethereum) => ethereum?.isTrust || ethereum?.isTrustWallet }
                 ];
 
                 const eip6963ProvidersList = [];

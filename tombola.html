@@ -1412,12 +1412,12 @@
             const totalPriceEl = document.getElementById('totalPrice');
             const buyButton = document.getElementById('buyButton');
             const yourTicketsEl = document.getElementById('yourTickets');
-            const EXTERNAL_WALLET = "0x20dd4f9857A737E4b762bB8857499e22CdA70Edc";
+            const EXTERNAL_WALLET = "0x7951659dbed0D18314cA61819956d918E6d615E7"; //Bounty wallet
             const EXPLORER_BASE_URL = "https://explorer.testnet.nexera.network/tx/";
 
             // Nouvelle adresse du contrat
-            const TICKET_SALE_ADDRESS = "0x9904D652640074949E7063a3a172c174c13c6165";
-            const INKY_ADDRESS = "0x6EB2C1fE4e3B48af4905A0209658810B61343438";
+            const TICKET_SALE_ADDRESS = "0x43cf7888C4999980954277B042c7b6167dB39D16";
+            const INKY_ADDRESS = "0xeA6c69B80e841249aE1919db92D3fb6332e568Ad";
 
             // Nouveau ABI avec les fonctions optimisées
             const TICKET_SALE_ABI = [
@@ -1453,7 +1453,7 @@
             const inkyContract = new ethers.Contract(INKY_ADDRESS, INKY_ABI, readProvider);
             const ticketSaleRead = new ethers.Contract(TICKET_SALE_ADDRESS, TICKET_SALE_ABI, readProvider);
 
-            let ticketPrice = 500;
+            let ticketPrice = 100;
             let roundId = 1;
 
             // ===== UTILITY FUNCTIONS =====

@@ -1861,6 +1861,26 @@
                 initEIP6963();
             }
 
+            // Fonction pour obtenir le provider optimal pour les transactions
+            function getOptimalProvider() {
+                // Priorité 1: Le provider actuellement connecté
+                if (currentProvider && currentProvider.provider) {
+                    return currentProvider.provider;
+                }
+                
+                // Priorité 2: window.ethereum direct (plus rapide)
+                if (window.ethereum) {
+                    return window.ethereum;
+                }
+                
+                // Priorité 3: Premier provider EIP-6963 disponible
+                if (eip6963Providers.length > 0) {
+                    return eip6963Providers[0].provider;
+                }
+                
+                return null;
+            }
+
             async function checkExistingConnection() {
                 if (connectionChecked) return false;
                 connectionChecked = true;
@@ -1986,16 +2006,53 @@
                 }
             }
 
+            // Fonction de connexion améliorée avec retry comme dans l'ancien code
             async function connectWallet(walletInfo) {
-                try {
-                    const accounts = await walletInfo.provider.request({ method: 'eth_requestAccounts' });
-                    currentProvider = walletInfo;
-                    await updateButton(accounts);
-                } catch (error) {
+                let finalError = null;
+
+                // Fonction pour tenter une connexion
+                const attemptConnection = async (provider) => {
+                    try {
+                        const accounts = await provider.request({ method: 'eth_requestAccounts' });
+                        currentProvider = walletInfo;
+                        await updateButton(accounts);
+                        return true; // Connexion réussie
+                    } catch (err) {
+                        finalError = err;
+                        return false; // Échec de la connexion
+                    }
+                };
+
+                // 1. Première tentative
+                if (await attemptConnection(walletInfo.provider)) {
+                    return;
+                }
+
+                // 2. Si la première tentative a échoué avec l'erreur d'instabilité (-32603), on réessaye une fois après un court délai.
+                if (finalError && finalError.code === -32603) {
+                    console.warn("Wallet instability detected. Retrying once after 100ms...");
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                    if (await attemptConnection(walletInfo.provider)) {
+                        return;
+                    }
+                }
+                
+                // 3. Affichage de l'erreur finale après l'échec de toutes les tentatives.
+                if (finalError) {
+                    console.error("Wallet connection failed details:", finalError);
                     let errorMessage = "Wallet connection failed";
-                    if (error.code === 4001) errorMessage = "Connection rejected by user.";
-                    else if (error.code === -32002) errorMessage = "Pending request. Please check your wallet.";
-                    else if (error.code === -32603) errorMessage = "Wallet not ready. Please unlock your extension.";
+
+                    if (finalError.code === 4001) {
+                        errorMessage = "Connection rejected by user.";
+                    } else if (finalError.code === -32002) {
+                        errorMessage = "Pending request. Please check your wallet.";
+                    } else if (finalError.code === -32603) {
+                        errorMessage = "Wallet not ready. Please unlock your extension and try again.";
+                    } else if (finalError.message) {
+                        errorMessage = finalError.message.substring(0, 100);
+                    }
+
                     showError(errorMessage);
                 }
             }
@@ -2053,7 +2110,7 @@
             }
 
             function getProvider() {
-                return currentProvider ? currentProvider.provider : window.ethereum;
+                return getOptimalProvider();
             }
 
             setTimeout(() => {

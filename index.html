@@ -996,7 +996,7 @@
         </div>
         
         <div style="margin-top: 50px;">
-            <a href="https://snapshot.org/#/inky-council.eth" target="_blank" class="council-cta-link">
+            <a class="council-cta-link" id="snapshot-link" style="cursor: pointer;">
                 Access the Voting Space (Snapshot) <i class="fas fa-arrow-right"></i>
             </a>
         </div>
@@ -1221,6 +1221,12 @@
       
         document.querySelector('.buy-button').addEventListener('click', function() {
             showError('Waiting for Nexera DEX');
+        });
+
+        // ===== SNAPSHOT LINK CLICK HANDLER =====
+        document.getElementById('snapshot-link').addEventListener('click', function(e) {
+            e.preventDefault();
+            showError('Waiting for Nexera Chain integration with Snapshot');
         });
     </script>
 </body>

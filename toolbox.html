@@ -598,6 +598,21 @@
         }
 
         /* --- RESPONSIVE DESIGN --- */
+        @media all {
+            .button,
+            .logo,
+            .hamburger,
+            .nav-tabs a,
+            .revoke-btn,
+            #analyzeTokenButton,
+            #screenerButton,
+            #buttonVesting,
+            #sendBatchButton {
+                -webkit-tap-highlight-color: transparent;
+                outline: none;
+            }
+        }
+
         @media (max-width: 1024px) {
             .multisender-columns {
                 grid-template-columns: 1fr;
@@ -643,19 +658,6 @@
                 z-index: 999;
                 backdrop-filter: blur(10px);
                 overflow-y: auto;
-            }
-
-            .button,
-            .logo,
-            .hamburger,
-            .nav-tabs a,
-            .revoke-btn,
-            #analyzeTokenButton,
-            #screenerButton,
-            #buttonVesting,
-            #sendBatchButton {
-                -webkit-tap-highlight-color: transparent;
-                outline: none;
             }
             
             .nav-tabs.active {
@@ -734,19 +736,6 @@
                 font-size: 18px; 
             }
             
-            .button,
-            .logo,
-            .hamburger,
-            .nav-tabs a,
-            .revoke-btn,
-            #analyzeTokenButton,
-            #screenerButton,
-            #buttonVesting,
-            #sendBatchButton {
-                -webkit-tap-highlight-color: transparent;
-                outline: none;
-            }
-
             .toolbox-header {
                 flex-direction: column;
                 gap: 10px;
@@ -794,19 +783,6 @@
             
             .logo span {
                 font-size: 16px;
-            }
-
-            .button,
-            .logo,
-            .hamburger,
-            .nav-tabs a,
-            .revoke-btn,
-            #analyzeTokenButton,
-            #screenerButton,
-            #buttonVesting,
-            #sendBatchButton {
-                -webkit-tap-highlight-color: transparent;
-                outline: none;
             }
             
             .revoke-btn {

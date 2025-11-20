@@ -586,6 +586,22 @@
                 outline: none;
             }
         }
+
+        @media (hover: none) and (pointer: coarse) {
+            .button:hover {
+                transform: none;
+                box-shadow: none;
+                animation: none;
+                color: #fff;
+            }
+
+            .button:active {
+                transform: scale(1.05);
+                box-shadow: 0 0 15px 3px #6C7A89;
+                animation: gradientAnimation 3s ease infinite;
+                color: var(--primary-gold);
+            }
+        }
         
         /* Tablet devices (801px to 1000px) */
         @media (max-width: 1000px) {

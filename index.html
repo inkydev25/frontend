@@ -588,11 +588,17 @@
         }
 
         @media (hover: none) and (pointer: coarse) {
-            .button:hover,
+            .button:hover {
+                transform: none;
+                box-shadow: none;
+                animation: none;
+                color: #fff;
+            }
+
             .button:active {
-                transform: none !important;
-                box-shadow: none !important;
-                animation: none !important;
+                transform: scale(1.05);
+                box-shadow: 0 0 15px 3px #6C7A89;
+                color: var(--primary-gold);
             }
         }
         

@@ -2393,6 +2393,14 @@
                 buyButton.disabled = true;
                 try {
                     const provider = new ethers.BrowserProvider(getProvider());
+                    const network = await provider.getNetwork();
+                    const NEXERA_TESTNET_CHAIN_ID = 72080;
+
+                    if (network.chainId !== BigInt(NEXERA_TESTNET_CHAIN_ID)) {
+                        showError("Please switch to Nexera Testnet in your wallet");
+                        buyButton.disabled = false;
+                        return;
+                    }
                     const signer = await provider.getSigner();
                     const ticketSaleContract = new ethers.Contract(TICKET_SALE_ADDRESS, TICKET_SALE_ABI, signer);
                     const inkyContractWithSigner = new ethers.Contract(INKY_ADDRESS, INKY_ABI, signer);

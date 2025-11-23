@@ -1406,6 +1406,8 @@
             const totalPriceEl = document.getElementById('totalPrice');
             const buyButton = document.getElementById('buyButton');
             const yourTicketsEl = document.getElementById('yourTickets');
+            const NEXERA_TESTNET_CHAIN_ID = 72080;
+            const NEXERA_TESTNET_CHAIN_ID_HEX = '0x11990'; 
             const EXTERNAL_WALLET = "0x7951659dbed0D18314cA61819956d918E6d615E7"; //Bounty wallet
             const EXPLORER_BASE_URL = "https://explorer.testnet.nexera.network/tx/";
 
@@ -1890,6 +1892,22 @@
                         if (savedProvider) {
                             const accounts = await savedProvider.provider.request({ method: 'eth_accounts' });
                             if (accounts.length > 0) {
+                                
+                                // === DÉBUT AJOUT ===
+                                // Forcer le switch vers Nexera Testnet pour connexion existante
+                                try {
+                                    const currentChainId = await savedProvider.provider.request({ method: 'eth_chainId' });
+                                    if (currentChainId !== NEXERA_TESTNET_CHAIN_ID_HEX) {
+                                        await savedProvider.provider.request({
+                                            method: 'wallet_switchEthereumChain',
+                                            params: [{ chainId: NEXERA_TESTNET_CHAIN_ID_HEX }]
+                                        });
+                                    }
+                                } catch (switchError) {
+                                    console.log("Existing connection network switch failed:", switchError);
+                                }
+                                // === FIN AJOUT ===
+                                
                                 currentProvider = savedProvider;
                                 await updateButton(accounts);
                                 return true;
@@ -1910,7 +1928,6 @@
                     { name: 'MetaMask', rdns: 'io.metamask', traditionalCheck: (ethereum) => ethereum?.isMetaMask && !ethereum?.isRabby && !ethereum?.isTrust },
                     { name: 'Rabby Wallet', rdns: 'io.rabby', traditionalCheck: (ethereum) => ethereum?.isRabby },
                     { name: 'Coinbase Wallet', rdns: 'com.coinbase.wallet', traditionalCheck: (ethereum) => ethereum?.isCoinbaseWallet || typeof window.coinbaseWalletExtension !== 'undefined' },
-                    { name: 'Phantom', rdns: 'app.phantom', traditionalCheck: (ethereum) => ethereum?.isPhantom || typeof window.phantom?.ethereum !== 'undefined' },
                     { name: 'Trust Wallet', rdns: 'com.trustwallet.app', traditionalCheck: (ethereum) => ethereum?.isTrust || ethereum?.isTrustWallet }
                 ];
 
@@ -2008,12 +2025,23 @@
                 const attemptConnection = async (provider) => {
                     try {
                         const accounts = await provider.request({ method: 'eth_requestAccounts' });
+                        try {
+                            const currentChainId = await provider.request({ method: 'eth_chainId' });
+                            if (currentChainId !== NEXERA_TESTNET_CHAIN_ID_HEX) {
+                                await provider.request({
+                                    method: 'wallet_switchEthereumChain',
+                                    params: [{ chainId: NEXERA_TESTNET_CHAIN_ID_HEX }]
+                                });
+                            }
+                        } catch (switchError) {
+                            console.log("Network switch failed:", switchError);
+                        }
                         currentProvider = walletInfo;
                         await updateButton(accounts);
-                        return true; // Connexion réussie
+                        return true;
                     } catch (err) {
                         finalError = err;
-                        return false; // Échec de la connexion
+                        return false;
                     }
                 };
 
@@ -2394,13 +2422,14 @@
                 try {
                     const provider = new ethers.BrowserProvider(getProvider());
                     const network = await provider.getNetwork();
-                    const NEXERA_TESTNET_CHAIN_ID = 72080;
+                    // const NEXERA_TESTNET_CHAIN_ID = 72080;
 
                     if (network.chainId !== BigInt(NEXERA_TESTNET_CHAIN_ID)) {
                         showError("Please switch to Nexera Testnet in your wallet");
                         buyButton.disabled = false;
                         return;
                     }
+                    
                     const signer = await provider.getSigner();
                     const ticketSaleContract = new ethers.Contract(TICKET_SALE_ADDRESS, TICKET_SALE_ABI, signer);
                     const inkyContractWithSigner = new ethers.Contract(INKY_ADDRESS, INKY_ABI, signer);

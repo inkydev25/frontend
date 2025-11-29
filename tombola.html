@@ -630,16 +630,6 @@
                 -webkit-tap-highlight-color: transparent;
                 outline: none;
             }
-
-            .burned-box { order: 1; }
-            .pool-box { order: 2; }
-            .countdown-box { order: 3; }
-            .balance-box { order: 4; }
-            .stats-box { order: 5; }           
-            .participants-box { order: 6; }
-            .last-draw-box { order: 7; }
-            .chart-box { order: 8; }
-            .historical-box { order: 9; }
         }
 
         /* Large screens (default) - no changes needed */
@@ -695,7 +685,18 @@
                 grid-template-rows: auto;
                 gap: 10px;
             }
-                        
+            
+            /* NOUVELLE ORGANISATION POUR MOBILE/TABLETTE */
+            .pool-box { order: 1; }
+            .countdown-box { order: 2; }
+            .balance-box { order: 3; }
+            .burned-box { order: 4; }
+            .stats-box { order: 5; }           
+            .participants-box { order: 6; }
+            .last-draw-box { order: 7; }
+            .chart-box { order: 8; }
+            .historical-box { order: 9; }
+            
             .burned-box, .pool-box, .countdown-box, .balance-box, .historical-box, 
             .last-draw-box, .stats-box, .participants-box, .chart-box {
                 grid-column: 1 / -1;
@@ -812,6 +813,16 @@
                 flex-direction: column;
                 align-items: center;
             }
+            
+            .pool-box { order: 1; }
+            .countdown-box { order: 2; }
+            .balance-box { order: 3; }
+            .burned-box { order: 4; }
+            .stats-box { order: 5; }           
+            .participants-box { order: 6; }
+            .last-draw-box { order: 7; }
+            .chart-box { order: 8; }
+            .historical-box { order: 9; }
 
             .page-title-container {
                 flex-direction: row;
@@ -948,6 +959,16 @@
                 align-items: center;
                 gap: 3px; 
             }
+
+            .pool-box { order: 1; }
+            .countdown-box { order: 2; }
+            .balance-box { order: 3; }
+            .burned-box { order: 4; }
+            .stats-box { order: 5; }           
+            .participants-box { order: 6; }
+            .last-draw-box { order: 7; }
+            .chart-box { order: 8; }
+            .historical-box { order: 9; }
 
             .page-title-container {
                 flex-direction: row;
@@ -1116,6 +1137,16 @@
                 display: flex;
                 flex-direction: column;
             }
+
+            .pool-box { order: 1; }
+            .countdown-box { order: 2; }
+            .balance-box { order: 3; }
+            .burned-box { order: 4; }
+            .stats-box { order: 5; }           
+            .participants-box { order: 6; }
+            .last-draw-box { order: 7; }
+            .chart-box { order: 8; }
+            .historical-box { order: 9; }
             
             /* CENTRER LES TITRES SPÉCIFIQUES */
             .stats-box h3,
